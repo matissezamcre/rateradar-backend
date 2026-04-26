@@ -1,0 +1,2093 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RateRadar — Surveillance des prix hôteliers en temps réel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<style>
+:root {
+  --primary: #3B82F6;
+  --secondary: #8B5CF6;
+  --bg: #050A18;
+  --bg2: #0A1128;
+  --bg3: #0F1A35;
+  --glass: rgba(255,255,255,0.04);
+  --glass-border: rgba(255,255,255,0.08);
+  --text: #F0F4FF;
+  --text-muted: #8892B0;
+  --danger: #EF4444;
+  --success: #10B981;
+  --card-glow-blue: rgba(59,130,246,0.15);
+  --card-glow-violet: rgba(139,92,246,0.15);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;overflow-x:hidden;min-height:100vh;}
+h1,h2,h3,h4,h5{font-family:'Space Grotesk',sans-serif;}
+
+/* ── GRADIENT TEXT ── */
+.grad{background:linear-gradient(135deg,var(--primary),var(--secondary));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+
+/* ── BACKGROUND ORBS ── */
+.orbs{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden;}
+.orb{position:absolute;border-radius:50%;filter:blur(80px);opacity:.35;animation:orbFloat 12s ease-in-out infinite;}
+.orb1{width:600px;height:600px;background:radial-gradient(circle,#3B82F6,transparent 70%);top:-200px;left:-150px;animation-delay:0s;}
+.orb2{width:500px;height:500px;background:radial-gradient(circle,#8B5CF6,transparent 70%);bottom:-150px;right:-100px;animation-delay:-4s;}
+.orb3{width:350px;height:350px;background:radial-gradient(circle,#3B82F6,transparent 70%);top:40%;left:55%;animation-delay:-8s;}
+@keyframes orbFloat{0%,100%{transform:translateY(0) scale(1);}50%{transform:translateY(-40px) scale(1.05);}}
+
+/* ── NAVBAR ── */
+#navbar{position:fixed;top:0;left:0;right:0;z-index:1000;padding:0 32px;height:68px;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);background:rgba(5,10,24,.75);border-bottom:1px solid var(--glass-border);transition:all .3s;}
+.nav-logo{font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:1.35rem;background:linear-gradient(135deg,var(--primary),var(--secondary));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;cursor:pointer;letter-spacing:-.5px;}
+.nav-links{display:flex;gap:4px;}
+.nav-link{background:none;border:none;color:var(--text-muted);font-family:'Inter',sans-serif;font-size:.875rem;font-weight:500;padding:8px 14px;border-radius:8px;cursor:pointer;transition:all .2s;}
+.nav-link:hover,.nav-link.active{color:var(--text);background:var(--glass);}
+.nav-auth{display:flex;gap:8px;align-items:center;}
+.btn-ghost{background:transparent;border:1px solid var(--glass-border);color:var(--text);font-family:'Inter',sans-serif;font-size:.875rem;font-weight:500;padding:8px 18px;border-radius:8px;cursor:pointer;transition:all .2s;}
+.btn-ghost:hover{border-color:var(--primary);color:var(--primary);}
+.btn-primary{background:linear-gradient(135deg,var(--primary),var(--secondary));border:none;color:#fff;font-family:'Inter',sans-serif;font-size:.875rem;font-weight:600;padding:8px 18px;border-radius:8px;cursor:pointer;transition:all .2s;box-shadow:0 0 20px rgba(59,130,246,.3);}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 0 30px rgba(59,130,246,.5);}
+.btn-primary:active{transform:translateY(0);}
+
+/* user avatar dropdown */
+.user-menu{position:relative;}
+.user-avatar-btn{display:flex;align-items:center;gap:10px;background:var(--glass);border:1px solid var(--glass-border);border-radius:10px;padding:6px 12px;cursor:pointer;transition:all .2s;}
+.user-avatar-btn:hover{border-color:var(--primary);}
+.avatar-circle{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--secondary));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.8rem;color:#fff;flex-shrink:0;}
+.user-name-nav{font-size:.85rem;font-weight:500;color:var(--text);}
+.dropdown-arrow{font-size:.65rem;color:var(--text-muted);transition:transform .2s;}
+.user-dropdown{position:absolute;top:calc(100% + 8px);right:0;background:#0F1A35;border:1px solid var(--glass-border);border-radius:10px;min-width:180px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.6);display:none;z-index:1100;}
+.user-dropdown.open{display:block;animation:fadeDown .15s ease;}
+@keyframes fadeDown{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
+.dropdown-item{display:block;width:100%;background:none;border:none;color:var(--text-muted);font-family:'Inter',sans-serif;font-size:.875rem;padding:10px 16px;cursor:pointer;text-align:left;transition:all .15s;}
+.dropdown-item:hover{background:var(--glass);color:var(--text);}
+.dropdown-item.danger:hover{color:var(--danger);}
+
+/* ── MAIN CONTENT ── */
+main{padding-top:68px;position:relative;z-index:1;}
+.section{display:none;min-height:calc(100vh - 68px);}
+.section.active{display:block;}
+
+/* ── HERO ── */
+#hero{padding:100px 0 80px;text-align:center;position:relative;}
+.hero-content{max-width:860px;margin:0 auto;padding:0 24px;}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);border-radius:100px;padding:6px 16px;font-size:.8rem;font-weight:600;color:var(--primary);margin-bottom:28px;letter-spacing:.5px;}
+.hero-badge::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--primary);box-shadow:0 0 8px var(--primary);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+.hero-h1{font-size:clamp(2.4rem,5.5vw,4rem);font-weight:800;line-height:1.15;letter-spacing:-1.5px;margin-bottom:24px;}
+.hero-sub{font-size:1.15rem;color:var(--text-muted);line-height:1.75;max-width:640px;margin:0 auto 40px;}
+.hero-btns{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;}
+.btn-lg{font-size:1rem;padding:14px 30px;border-radius:10px;}
+.btn-ghost-lg{background:transparent;border:1px solid var(--glass-border);color:var(--text);font-family:'Inter',sans-serif;font-size:1rem;font-weight:500;padding:14px 30px;border-radius:10px;cursor:pointer;transition:all .2s;}
+.btn-ghost-lg:hover{border-color:var(--primary);color:var(--primary);}
+
+/* floating price cards */
+.hero-visual{position:relative;max-width:680px;margin:70px auto 0;height:260px;}
+.price-card{position:absolute;background:rgba(15,26,53,.85);backdrop-filter:blur(20px);border:1px solid var(--glass-border);border-radius:16px;padding:16px 20px;min-width:200px;box-shadow:0 20px 60px rgba(0,0,0,.5);}
+.price-card-header{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+.hotel-dot{width:8px;height:8px;border-radius:50%;}
+.hotel-name{font-size:.8rem;font-weight:600;color:var(--text);}
+.price-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.price-label{font-size:.75rem;color:var(--text-muted);}
+.price-val{font-size:.95rem;font-weight:700;color:var(--text);}
+.badge-drop{background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.35);border-radius:6px;padding:3px 8px;font-size:.72rem;font-weight:700;color:#EF4444;animation:badgePop .4s ease both;}
+.badge-rise{background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.35);border-radius:6px;padding:3px 8px;font-size:.72rem;font-weight:700;color:#10B981;}
+@keyframes badgePop{from{opacity:0;transform:scale(.7);}to{opacity:1;transform:scale(1);}}
+.pc1{top:20px;left:0;animation:floatCard 6s ease-in-out infinite;}
+.pc2{top:60px;right:0;animation:floatCard 6s ease-in-out infinite;animation-delay:-2s;}
+.pc3{bottom:0;left:50%;transform:translateX(-50%);animation:floatCard 6s ease-in-out infinite;animation-delay:-4s;}
+@keyframes floatCard{0%,100%{transform:translateY(0);}50%{transform:translateY(-12px);}}
+.pc3{animation:floatCard3 6s ease-in-out infinite;animation-delay:-4s;}
+@keyframes floatCard3{0%,100%{transform:translateX(-50%) translateY(0);}50%{transform:translateX(-50%) translateY(-12px);}}
+
+/* ── SOCIAL PROOF ── */
+.social-proof{text-align:center;padding:40px 24px;border-top:1px solid var(--glass-border);border-bottom:1px solid var(--glass-border);margin:0 auto;max-width:100%;}
+.social-proof-inner{max-width:700px;margin:0 auto;}
+.proof-hotels{font-size:.95rem;color:var(--text-muted);margin-bottom:10px;}
+.proof-hotels strong{color:var(--text);}
+.stars{color:#F59E0B;font-size:1.1rem;letter-spacing:2px;}
+.proof-rating{font-size:.9rem;color:var(--text-muted);margin-top:6px;}
+.proof-rating strong{color:var(--text);}
+
+/* ── SECTIONS GENERAL ── */
+.section-block{padding:90px 24px;max-width:1100px;margin:0 auto;}
+.section-label{font-size:.75rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--primary);margin-bottom:14px;}
+.section-h2{font-size:clamp(1.8rem,3.5vw,2.8rem);font-weight:800;letter-spacing:-1px;margin-bottom:16px;line-height:1.2;}
+.section-sub{font-size:1rem;color:var(--text-muted);line-height:1.7;max-width:560px;}
+.center{text-align:center;}
+.center .section-sub{margin:0 auto;}
+
+/* ── PAIN CARDS ── */
+.pain-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;margin-top:56px;}
+.pain-card{background:var(--glass);border:1px solid var(--glass-border);border-radius:20px;padding:32px;transition:all .3s;position:relative;overflow:hidden;}
+.pain-card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,var(--card-glow-blue),transparent);opacity:0;transition:opacity .3s;}
+.pain-card:hover::before{opacity:1;}
+.pain-card:hover{transform:translateY(-4px);border-color:rgba(59,130,246,.3);}
+.pain-emoji{font-size:2.5rem;margin-bottom:16px;display:block;}
+.pain-title{font-size:1.05rem;font-weight:700;margin-bottom:10px;}
+.pain-text{font-size:.9rem;color:var(--text-muted);line-height:1.65;}
+
+/* ── SOLUTION CARDS ── */
+.solution-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;margin-top:56px;}
+.sol-card{background:var(--glass);border:1px solid var(--glass-border);border-radius:20px;padding:36px;transition:all .3s;position:relative;overflow:hidden;}
+.sol-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--primary),var(--secondary));transform:scaleX(0);transition:transform .3s;}
+.sol-card:hover::after{transform:scaleX(1);}
+.sol-card:hover{transform:translateY(-5px);box-shadow:0 20px 60px rgba(59,130,246,.12);}
+.sol-icon{width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,rgba(59,130,246,.2),rgba(139,92,246,.2));border:1px solid rgba(59,130,246,.25);display:flex;align-items:center;justify-content:center;font-size:1.5rem;margin-bottom:20px;}
+.sol-title{font-size:1.1rem;font-weight:700;margin-bottom:10px;}
+.sol-text{font-size:.9rem;color:var(--text-muted);line-height:1.65;}
+
+/* ── HOW IT WORKS ── */
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:0;margin-top:60px;position:relative;}
+.steps::before{content:'';position:absolute;top:34px;left:16.66%;right:16.66%;height:2px;background:linear-gradient(90deg,var(--primary),var(--secondary));opacity:.3;}
+.step{text-align:center;padding:0 20px;}
+.step-num{width:68px;height:68px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--secondary));display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:1.5rem;font-weight:800;color:#fff;margin:0 auto 24px;box-shadow:0 0 30px rgba(59,130,246,.4);}
+.step-title{font-size:1.05rem;font-weight:700;margin-bottom:10px;}
+.step-text{font-size:.875rem;color:var(--text-muted);line-height:1.65;}
+
+/* ── TESTIMONIALS ── */
+.testi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:24px;margin-top:56px;}
+.testi-card{background:var(--glass);border:1px solid var(--glass-border);border-radius:20px;padding:32px;transition:all .3s;position:relative;}
+.testi-card:hover{transform:translateY(-4px);border-color:rgba(139,92,246,.3);box-shadow:0 20px 60px rgba(139,92,246,.1);}
+.testi-stars{color:#F59E0B;font-size:.9rem;letter-spacing:2px;margin-bottom:16px;}
+.testi-quote{font-size:.95rem;color:var(--text-muted);line-height:1.75;margin-bottom:20px;font-style:italic;}
+.testi-quote::before{content:'"';font-size:2rem;color:var(--primary);line-height:0;vertical-align:-.4em;margin-right:4px;}
+.testi-author{display:flex;align-items:center;gap:12px;}
+.testi-av{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--secondary));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;color:#fff;flex-shrink:0;}
+.testi-name{font-size:.9rem;font-weight:700;}
+.testi-hotel{font-size:.8rem;color:var(--text-muted);}
+
+/* ── CTA BANNER ── */
+.cta-banner{margin:0 24px 90px;border-radius:24px;background:linear-gradient(135deg,rgba(59,130,246,.15),rgba(139,92,246,.15));border:1px solid rgba(59,130,246,.2);padding:70px 40px;text-align:center;position:relative;overflow:hidden;}
+.cta-banner::before{content:'';position:absolute;inset:-50%;background:radial-gradient(ellipse,rgba(59,130,246,.08),transparent 60%);pointer-events:none;}
+.cta-banner h2{font-size:clamp(1.8rem,3vw,2.6rem);font-weight:800;letter-spacing:-1px;margin-bottom:16px;}
+.cta-banner p{color:var(--text-muted);font-size:1rem;margin-bottom:32px;}
+
+/* ── FEATURES PAGE ── */
+.feat-hero{padding:80px 24px 60px;text-align:center;max-width:800px;margin:0 auto;}
+.feat-blocks{padding:0 24px 90px;max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:80px;}
+.feat-block{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center;}
+.feat-block.reverse{direction:rtl;}
+.feat-block.reverse>*{direction:ltr;}
+.feat-mockup{background:var(--glass);border:1px solid var(--glass-border);border-radius:20px;padding:24px;min-height:280px;display:flex;flex-direction:column;gap:12px;position:relative;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.4);}
+.feat-mockup::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(59,130,246,.05),rgba(139,92,246,.05));}
+.mock-bar{display:flex;gap:6px;margin-bottom:8px;}
+.mock-dot{width:10px;height:10px;border-radius:50%;}
+.mock-row{background:rgba(255,255,255,.06);border-radius:8px;height:14px;width:100%;}
+.mock-row.w60{width:60%;}
+.mock-row.w40{width:40%;}
+.mock-row.w80{width:80%;}
+.mock-chart{flex:1;border-radius:12px;background:linear-gradient(180deg,rgba(59,130,246,.15),transparent);border:1px solid rgba(59,130,246,.15);display:flex;align-items:flex-end;padding:12px;gap:8px;}
+.bar-col{flex:1;background:linear-gradient(180deg,var(--primary),var(--secondary));border-radius:4px 4px 0 0;opacity:.7;}
+.feat-info{padding:10px 0;}
+.feat-tag{font-size:.72rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--primary);margin-bottom:12px;}
+.feat-title{font-size:clamp(1.4rem,2.5vw,1.9rem);font-weight:800;letter-spacing:-.5px;margin-bottom:14px;}
+.feat-desc{font-size:.95rem;color:var(--text-muted);line-height:1.75;margin-bottom:24px;}
+.feat-bullets{list-style:none;display:flex;flex-direction:column;gap:10px;}
+.feat-bullets li{display:flex;align-items:flex-start;gap:10px;font-size:.9rem;color:var(--text-muted);line-height:1.5;}
+.feat-bullets li::before{content:'✓';color:var(--primary);font-weight:700;flex-shrink:0;margin-top:1px;}
+
+/* ── PRICING PAGE ── */
+.pricing-hero{padding:80px 24px 50px;text-align:center;max-width:700px;margin:0 auto;}
+.toggle-wrap{display:flex;align-items:center;justify-content:center;gap:14px;margin:28px 0 56px;}
+.toggle-label{font-size:.9rem;color:var(--text-muted);}
+.toggle-label.active{color:var(--text);font-weight:600;}
+.toggle-switch{position:relative;width:52px;height:28px;background:var(--glass);border:1px solid var(--glass-border);border-radius:100px;cursor:pointer;transition:background .25s;}
+.toggle-switch.on{background:linear-gradient(135deg,var(--primary),var(--secondary));}
+.toggle-knob{position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .25s;}
+.toggle-switch.on .toggle-knob{transform:translateX(24px);}
+.badge-save{background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.3);border-radius:6px;padding:3px 8px;font-size:.72rem;font-weight:700;color:#10B981;}
+.plans-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;max-width:1000px;margin:0 auto;padding:0 24px 80px;}
+.plan-card{background:var(--glass);border:1px solid var(--glass-border);border-radius:24px;padding:36px;transition:all .35s;position:relative;overflow:hidden;}
+.plan-card.popular{border-color:rgba(59,130,246,.5);background:rgba(59,130,246,.06);box-shadow:0 0 60px rgba(59,130,246,.15);}
+.plan-card:hover{transform:translateY(-6px);}
+.plan-card.popular:hover{box-shadow:0 20px 80px rgba(59,130,246,.25);}
+.plan-badge{position:absolute;top:20px;right:20px;background:linear-gradient(135deg,var(--primary),var(--secondary));border-radius:8px;padding:4px 12px;font-size:.72rem;font-weight:700;color:#fff;}
+.plan-name{font-size:.85rem;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:12px;}
+.plan-price{font-family:'Space Grotesk',sans-serif;font-size:3rem;font-weight:800;letter-spacing:-2px;line-height:1;}
+.plan-price span{font-size:1rem;font-weight:500;color:var(--text-muted);letter-spacing:0;}
+.plan-period{font-size:.8rem;color:var(--text-muted);margin-top:4px;margin-bottom:28px;}
+.plan-divider{height:1px;background:var(--glass-border);margin-bottom:24px;}
+.plan-features{list-style:none;display:flex;flex-direction:column;gap:12px;margin-bottom:32px;}
+.plan-features li{display:flex;align-items:flex-start;gap:10px;font-size:.875rem;color:var(--text-muted);line-height:1.5;}
+.plan-features li .check{color:var(--primary);flex-shrink:0;font-weight:700;}
+.plan-btn{width:100%;padding:13px;border-radius:10px;font-family:'Inter',sans-serif;font-size:.9rem;font-weight:600;cursor:pointer;transition:all .25s;border:none;}
+.plan-btn-outline{background:transparent;border:1px solid var(--glass-border)!important;color:var(--text);}
+.plan-btn-outline:hover{border-color:var(--primary)!important;color:var(--primary);}
+.plan-btn-primary{background:linear-gradient(135deg,var(--primary),var(--secondary));color:#fff;box-shadow:0 0 30px rgba(59,130,246,.3);}
+.plan-btn-primary:hover{box-shadow:0 0 50px rgba(59,130,246,.5);transform:translateY(-1px);}
+
+/* ── FAQ PAGE ── */
+.faq-hero{padding:80px 24px 50px;text-align:center;max-width:700px;margin:0 auto;}
+.faq-list{max-width:760px;margin:0 auto;padding:0 24px 90px;display:flex;flex-direction:column;gap:12px;}
+.faq-item{background:var(--glass);border:1px solid var(--glass-border);border-radius:16px;overflow:hidden;transition:border-color .2s;}
+.faq-item.open{border-color:rgba(59,130,246,.3);}
+.faq-q{display:flex;align-items:center;justify-content:space-between;padding:22px 24px;cursor:pointer;font-weight:600;font-size:.95rem;gap:16px;}
+.faq-chevron{flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--glass);border:1px solid var(--glass-border);display:flex;align-items:center;justify-content:center;font-size:.7rem;transition:transform .3s,background .2s;}
+.faq-item.open .faq-chevron{transform:rotate(180deg);background:rgba(59,130,246,.2);border-color:rgba(59,130,246,.3);}
+.faq-a{padding:0 24px 22px;font-size:.9rem;color:var(--text-muted);line-height:1.75;display:none;}
+.faq-item.open .faq-a{display:block;}
+
+/* ── CONTACT PAGE ── */
+.contact-wrap{max-width:1000px;margin:0 auto;padding:80px 24px;display:grid;grid-template-columns:1fr 1.4fr;gap:60px;align-items:start;}
+.contact-info-block{display:flex;flex-direction:column;gap:32px;}
+.contact-h2{font-size:clamp(1.6rem,3vw,2.2rem);font-weight:800;letter-spacing:-.5px;margin-bottom:16px;}
+.contact-sub{font-size:.95rem;color:var(--text-muted);line-height:1.7;}
+.contact-item{display:flex;align-items:flex-start;gap:14px;}
+.contact-icon{width:42px;height:42px;border-radius:12px;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.2);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;}
+.contact-item-label{font-size:.75rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px;}
+.contact-item-val{font-size:.9rem;color:var(--text);}
+.contact-form{background:var(--glass);border:1px solid var(--glass-border);border-radius:24px;padding:36px;}
+.form-group{margin-bottom:20px;}
+.form-label{display:block;font-size:.8rem;font-weight:600;color:var(--text-muted);margin-bottom:8px;letter-spacing:.3px;}
+.form-input{width:100%;background:rgba(255,255,255,.04);border:1px solid var(--glass-border);border-radius:10px;padding:12px 16px;color:var(--text);font-family:'Inter',sans-serif;font-size:.9rem;transition:border-color .2s,box-shadow .2s;outline:none;}
+.form-input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(59,130,246,.12);}
+.form-input::placeholder{color:var(--text-muted);}
+textarea.form-input{resize:vertical;min-height:120px;}
+.form-submit{width:100%;padding:14px;background:linear-gradient(135deg,var(--primary),var(--secondary));border:none;border-radius:10px;color:#fff;font-family:'Inter',sans-serif;font-size:.95rem;font-weight:600;cursor:pointer;transition:all .25s;box-shadow:0 0 30px rgba(59,130,246,.3);}
+.form-submit:hover{transform:translateY(-2px);box-shadow:0 0 50px rgba(59,130,246,.5);}
+
+/* ── FOOTER ── */
+footer{background:var(--bg2);border-top:1px solid var(--glass-border);padding:70px 24px 30px;}
+.footer-inner{max-width:1100px;margin:0 auto;}
+.footer-top{display:grid;grid-template-columns:1.5fr repeat(3,1fr);gap:40px;margin-bottom:56px;}
+.footer-brand{}
+.footer-logo{font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:1.3rem;background:linear-gradient(135deg,var(--primary),var(--secondary));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:12px;}
+.footer-tagline{font-size:.875rem;color:var(--text-muted);line-height:1.65;max-width:240px;}
+.footer-col-title{font-size:.8rem;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text);margin-bottom:16px;}
+.footer-links{list-style:none;display:flex;flex-direction:column;gap:10px;}
+.footer-links a{color:var(--text-muted);font-size:.875rem;text-decoration:none;transition:color .2s;cursor:pointer;}
+.footer-links a:hover{color:var(--primary);}
+.footer-bottom{border-top:1px solid var(--glass-border);padding-top:28px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;}
+.footer-copy{font-size:.8rem;color:var(--text-muted);}
+.footer-copy span{color:var(--primary);}
+
+/* ── AUTH MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(8px);z-index:2000;display:none;align-items:center;justify-content:center;padding:24px;}
+.modal-overlay.open{display:flex;animation:fadeIn .2s ease;}
+@keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+.modal{background:#0A1128;border:1px solid var(--glass-border);border-radius:24px;padding:36px;width:100%;max-width:420px;position:relative;box-shadow:0 40px 100px rgba(0,0,0,.6);}
+.modal-close{position:absolute;top:16px;right:16px;background:var(--glass);border:1px solid var(--glass-border);border-radius:8px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-muted);font-size:1.1rem;transition:all .15s;}
+.modal-close:hover{background:rgba(239,68,68,.15);color:var(--danger);border-color:rgba(239,68,68,.3);}
+.modal-tabs{display:flex;gap:4px;background:rgba(255,255,255,.04);border-radius:10px;padding:4px;margin-bottom:28px;}
+.modal-tab{flex:1;background:none;border:none;color:var(--text-muted);font-family:'Inter',sans-serif;font-size:.875rem;font-weight:600;padding:9px;border-radius:7px;cursor:pointer;transition:all .2s;}
+.modal-tab.active{background:#0F1A35;color:var(--text);box-shadow:0 2px 10px rgba(0,0,0,.3);}
+.modal-form-panel{display:none;}
+.modal-form-panel.active{display:block;}
+.modal-title{font-size:1.4rem;font-weight:800;margin-bottom:6px;}
+.modal-subtitle{font-size:.875rem;color:var(--text-muted);margin-bottom:24px;}
+.modal-footer-text{text-align:center;font-size:.8rem;color:var(--text-muted);margin-top:16px;}
+.msg-error{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:10px 14px;font-size:.82rem;color:#EF4444;margin-bottom:16px;display:none;}
+.msg-error.show{display:block;}
+.msg-success{background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);border-radius:8px;padding:10px 14px;font-size:.82rem;color:#10B981;margin-bottom:16px;display:none;}
+.msg-success.show{display:block;}
+
+/* ── ADMIN BUTTON ── */
+#admin-btn{position:fixed;bottom:28px;right:28px;z-index:1500;background:linear-gradient(135deg,var(--primary),var(--secondary));border:none;border-radius:14px;padding:12px 20px;color:#fff;font-family:'Inter',sans-serif;font-size:.85rem;font-weight:700;cursor:pointer;box-shadow:0 8px 30px rgba(59,130,246,.4);display:none;align-items:center;gap:8px;transition:all .25s;}
+#admin-btn:hover{transform:translateY(-2px);box-shadow:0 12px 40px rgba(59,130,246,.6);}
+#admin-btn.visible{display:flex;}
+
+/* ── ADMIN PANEL ── */
+#admin-panel{position:fixed;top:0;right:-540px;width:520px;max-width:95vw;height:100vh;background:#080F22;border-left:1px solid var(--glass-border);z-index:3000;display:flex;flex-direction:column;transition:right .35s cubic-bezier(.4,0,.2,1);overflow:hidden;box-shadow:-20px 0 80px rgba(0,0,0,.6);}
+#admin-panel.open{right:0;}
+.ap-header{padding:20px 24px;border-bottom:1px solid var(--glass-border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.ap-title{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1.1rem;}
+.ap-title span{font-size:.75rem;color:var(--primary);background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.2);border-radius:6px;padding:2px 8px;margin-left:8px;}
+.ap-close{background:var(--glass);border:1px solid var(--glass-border);border-radius:8px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-muted);font-size:1.1rem;transition:all .15s;}
+.ap-close:hover{background:rgba(239,68,68,.15);color:var(--danger);}
+.ap-tabs{display:flex;border-bottom:1px solid var(--glass-border);flex-shrink:0;}
+.ap-tab{flex:1;background:none;border:none;color:var(--text-muted);font-family:'Inter',sans-serif;font-size:.8rem;font-weight:600;padding:14px 8px;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;}
+.ap-tab.active{color:var(--primary);border-bottom-color:var(--primary);}
+.ap-body{flex:1;overflow-y:auto;padding:24px;}
+.ap-body::-webkit-scrollbar{width:4px;}
+.ap-body::-webkit-scrollbar-track{background:transparent;}
+.ap-body::-webkit-scrollbar-thumb{background:var(--glass-border);border-radius:2px;}
+.ap-panel{display:none;}
+.ap-panel.active{display:block;}
+.ap-section-title{font-size:.72rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--primary);margin:24px 0 12px;}
+.ap-section-title:first-child{margin-top:0;}
+.ap-field{margin-bottom:14px;}
+.ap-label{font-size:.78rem;font-weight:600;color:var(--text-muted);display:block;margin-bottom:6px;}
+.ap-input{width:100%;background:rgba(255,255,255,.04);border:1px solid var(--glass-border);border-radius:8px;padding:10px 13px;color:var(--text);font-family:'Inter',sans-serif;font-size:.85rem;outline:none;transition:border-color .2s;}
+.ap-input:focus{border-color:var(--primary);}
+textarea.ap-input{resize:vertical;min-height:80px;}
+.ap-save-btn{width:100%;margin-top:8px;padding:11px;background:linear-gradient(135deg,var(--primary),var(--secondary));border:none;border-radius:8px;color:#fff;font-family:'Inter',sans-serif;font-size:.85rem;font-weight:600;cursor:pointer;transition:all .2s;}
+.ap-save-btn:hover{opacity:.85;}
+.color-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.color-field{display:flex;flex-direction:column;gap:6px;}
+.color-swatch{display:flex;align-items:center;gap:8px;}
+.color-swatch input[type=color]{width:36px;height:36px;border:none;background:none;cursor:pointer;border-radius:8px;padding:0;}
+.color-swatch .ap-input{flex:1;}
+/* Pricing feature edit */
+.feature-list-editor{display:flex;flex-direction:column;gap:6px;margin-bottom:8px;}
+.feat-edit-row{display:flex;gap:6px;align-items:center;}
+.feat-edit-row input{flex:1;background:rgba(255,255,255,.04);border:1px solid var(--glass-border);border-radius:7px;padding:8px 11px;color:var(--text);font-family:'Inter',sans-serif;font-size:.82rem;outline:none;}
+.feat-edit-row input:focus{border-color:var(--primary);}
+.feat-del{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:6px;padding:5px 9px;cursor:pointer;color:#EF4444;font-size:.75rem;transition:all .15s;}
+.feat-del:hover{background:rgba(239,68,68,.2);}
+.feat-add{background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.2);border-radius:7px;padding:8px;cursor:pointer;color:var(--primary);font-size:.82rem;transition:all .15s;width:100%;text-align:center;}
+.feat-add:hover{background:rgba(59,130,246,.2);}
+/* Users tab */
+.user-list{display:flex;flex-direction:column;gap:10px;}
+.user-row{background:var(--glass);border:1px solid var(--glass-border);border-radius:10px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.user-row-info{}
+.user-row-name{font-size:.9rem;font-weight:600;margin-bottom:2px;}
+.user-row-email{font-size:.78rem;color:var(--text-muted);}
+.user-row-date{font-size:.72rem;color:var(--text-muted);margin-top:2px;}
+.user-del-btn{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:7px 12px;cursor:pointer;color:#EF4444;font-size:.78rem;font-weight:600;transition:all .15s;white-space:nowrap;flex-shrink:0;}
+.user-del-btn:hover{background:rgba(239,68,68,.2);}
+
+/* ── SCROLL REVEAL ── */
+.reveal{opacity:0;transform:translateY(30px);transition:opacity .6s ease,transform .6s ease;}
+.reveal.visible{opacity:1;transform:translateY(0);}
+
+/* ── RESPONSIVE ── */
+@media(max-width:768px){
+  .nav-links{display:none;}
+  .feat-block,.feat-block.reverse{grid-template-columns:1fr;direction:ltr;}
+  .footer-top{grid-template-columns:1fr 1fr;}
+  .contact-wrap{grid-template-columns:1fr;}
+  .steps::before{display:none;}
+  #admin-panel{width:100%;max-width:100%;}
+  .hero-visual{height:auto;}
+  .pc1,.pc2,.pc3{position:relative;top:auto;left:auto;right:auto;bottom:auto;transform:none!important;margin:12px auto;display:block;max-width:260px;}
+  .price-card{animation:none!important;}
+}
+@media(max-width:480px){
+  .footer-top{grid-template-columns:1fr;}
+  .plans-grid{grid-template-columns:1fr;}
+}
+
+/* ── EMAIL CONFIRMATION SCREEN ── */
+.confirm-screen{text-align:center;padding:8px 0;}
+.confirm-icon{font-size:3rem;margin-bottom:16px;display:block;}
+.confirm-title{font-size:1.3rem;font-weight:800;margin-bottom:8px;}
+.confirm-text{font-size:.875rem;color:var(--text-muted);line-height:1.7;margin-bottom:20px;}
+.confirm-email-tag{display:inline-block;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.2);border-radius:8px;padding:6px 14px;font-size:.85rem;font-weight:600;color:var(--primary);margin:8px 0 16px;}
+.confirm-dev-box{background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:10px;padding:14px 16px;margin-top:16px;text-align:left;}
+.confirm-dev-label{font-size:.7rem;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#F59E0B;margin-bottom:8px;}
+.confirm-dev-link{font-size:.78rem;color:var(--text-muted);word-break:break-all;line-height:1.6;}
+.confirm-dev-link a{color:var(--primary);text-decoration:underline;cursor:pointer;}
+.confirm-resend{background:none;border:none;color:var(--primary);font-family:'Inter',sans-serif;font-size:.82rem;cursor:pointer;text-decoration:underline;margin-top:12px;}
+.confirm-warning{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:9px 13px;font-size:.8rem;color:#F59E0B;margin-bottom:14px;display:none;}
+.confirm-warning.show{display:block;}
+
+/* ── PAYMENT MODAL ── */
+#payment-modal{position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(10px);z-index:2500;display:none;align-items:center;justify-content:center;padding:24px;}
+#payment-modal.open{display:flex;animation:fadeIn .2s ease;}
+.pay-modal{background:#0A1128;border:1px solid var(--glass-border);border-radius:24px;width:100%;max-width:520px;position:relative;box-shadow:0 40px 100px rgba(0,0,0,.7);overflow:hidden;}
+.pay-header{padding:24px 28px 20px;border-bottom:1px solid var(--glass-border);display:flex;align-items:center;justify-content:space-between;}
+.pay-header-left h3{font-size:1.1rem;font-weight:800;}
+.pay-header-left p{font-size:.8rem;color:var(--text-muted);margin-top:3px;}
+.pay-close{background:var(--glass);border:1px solid var(--glass-border);border-radius:8px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-muted);font-size:1rem;transition:all .15s;}
+.pay-close:hover{background:rgba(239,68,68,.15);color:var(--danger);}
+.pay-body{padding:24px 28px;display:grid;grid-template-columns:1fr 1fr;gap:24px;}
+@media(max-width:560px){.pay-body{grid-template-columns:1fr;}}
+
+/* Order summary */
+.pay-summary{background:var(--glass);border:1px solid var(--glass-border);border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:14px;}
+.pay-sum-title{font-size:.72rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);}
+.pay-plan-name{font-size:1.3rem;font-weight:800;}
+.pay-plan-badge{display:inline-block;background:linear-gradient(135deg,var(--primary),var(--secondary));border-radius:6px;padding:3px 10px;font-size:.7rem;font-weight:700;color:#fff;margin-top:4px;}
+.pay-divider{height:1px;background:var(--glass-border);}
+.pay-price-line{display:flex;justify-content:space-between;align-items:center;font-size:.85rem;}
+.pay-price-line span:first-child{color:var(--text-muted);}
+.pay-price-line span:last-child{font-weight:600;}
+.pay-total-line{display:flex;justify-content:space-between;align-items:center;}
+.pay-total-line span:first-child{font-size:.9rem;font-weight:600;}
+.pay-total-line span:last-child{font-size:1.4rem;font-weight:800;background:linear-gradient(135deg,var(--primary),var(--secondary));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.pay-trial-badge{background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.25);border-radius:8px;padding:8px 12px;font-size:.78rem;color:#10B981;text-align:center;line-height:1.4;}
+
+/* Card form */
+.pay-form{display:flex;flex-direction:column;gap:0;}
+.pay-form-title{font-size:.72rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);margin-bottom:16px;}
+.pay-field{margin-bottom:14px;}
+.pay-label{font-size:.75rem;font-weight:600;color:var(--text-muted);display:block;margin-bottom:7px;}
+.pay-input{width:100%;background:rgba(255,255,255,.05);border:1px solid var(--glass-border);border-radius:10px;padding:11px 14px;color:var(--text);font-family:'Inter',sans-serif;font-size:.9rem;outline:none;transition:border-color .2s,box-shadow .2s;}
+.pay-input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(59,130,246,.12);}
+.pay-input::placeholder{color:#3d4a6a;}
+.pay-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.card-type-icon{position:relative;}
+.card-type-icon .pay-input{padding-right:50px;}
+.card-brand{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:.75rem;font-weight:700;color:var(--text-muted);}
+.pay-btn{width:100%;padding:14px;background:linear-gradient(135deg,var(--primary),var(--secondary));border:none;border-radius:10px;color:#fff;font-family:'Inter',sans-serif;font-size:.95rem;font-weight:700;cursor:pointer;transition:all .25s;box-shadow:0 0 30px rgba(59,130,246,.35);margin-top:4px;display:flex;align-items:center;justify-content:center;gap:8px;}
+.pay-btn:hover{transform:translateY(-2px);box-shadow:0 0 50px rgba(59,130,246,.55);}
+.pay-btn:disabled{opacity:.6;cursor:not-allowed;transform:none;}
+.pay-security{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:12px;font-size:.72rem;color:var(--text-muted);}
+.pay-security span{color:var(--success);}
+.pay-methods{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;}
+.pay-method{background:rgba(255,255,255,.06);border:1px solid var(--glass-border);border-radius:5px;padding:3px 8px;font-size:.68rem;font-weight:700;color:var(--text-muted);}
+
+/* Payment success screen */
+.pay-success{padding:40px 28px;text-align:center;display:none;}
+.pay-success.show{display:block;}
+.pay-form-wrap{}
+.pay-success-icon{font-size:3.5rem;margin-bottom:16px;}
+.pay-success-title{font-size:1.4rem;font-weight:800;margin-bottom:8px;}
+.pay-success-text{font-size:.875rem;color:var(--text-muted);line-height:1.7;}
+
+/* Spinner */
+@keyframes spin{to{transform:rotate(360deg);}}
+.spinner{width:18px;height:18px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;}
+
+/* ── TESTI EDIT (admin) ── */
+.testi-edit-block{background:var(--glass);border:1px solid var(--glass-border);border-radius:12px;padding:16px;margin-bottom:16px;}
+.testi-edit-block .ap-section-title{margin-top:0;font-size:.68rem;}
+.plan-section{background:var(--glass);border:1px solid var(--glass-border);border-radius:12px;padding:16px;margin-bottom:16px;}
+.plan-section .ap-section-title{margin-top:0;}
+
+/* ── LAUNCH PHASE PRICING ── */
+#hero-urgency-banner{display:none;margin-top:20px;text-align:center;animation:fadeIn .4s ease}
+.urgency-banner-inner{display:inline-flex;align-items:center;gap:10px;background:linear-gradient(135deg,rgba(239,68,68,.12),rgba(245,158,11,.12));border:1px solid rgba(239,68,68,.35);border-radius:100px;padding:9px 22px;font-size:.85rem;font-weight:600;color:#fca5a5}
+.urgency-fire{font-size:1rem;animation:pulse 1.5s infinite}
+.urgency-spots{background:rgba(239,68,68,.2);color:#fca5a5;border-radius:20px;padding:1px 8px;font-size:.78rem;font-weight:700}
+.plan-price-old{font-family:'Space Grotesk',sans-serif;font-size:1.2rem;font-weight:600;color:var(--text-muted);text-decoration:line-through;margin-bottom:2px;opacity:.7}
+.plan-price.launch{color:#34d399}
+.launch-phase-badge{display:inline-flex;align-items:center;gap:5px;background:linear-gradient(135deg,rgba(52,211,153,.12),rgba(16,185,129,.08));border:1px solid rgba(52,211,153,.3);color:#34d399;border-radius:6px;padding:3px 10px;font-size:.72rem;font-weight:700;margin:6px 0 2px;letter-spacing:.3px}
+.launch-guaranteed{font-size:.75rem;color:var(--text-muted);margin-bottom:10px!important;font-style:italic}
+.launch-progress-wrap{height:5px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden;margin:8px 0 4px}
+.launch-progress-fill{height:100%;background:linear-gradient(90deg,#10B981,#34d399);border-radius:3px;transition:width .5s ease}
+.launch-spots-text{font-size:.75rem;color:var(--text-muted);text-align:right;margin-bottom:14px}
+#launch-urgency-text{display:none;text-align:center;padding:0 24px 40px;max-width:600px;margin:0 auto}
+.urgency-text-inner{background:linear-gradient(135deg,rgba(239,68,68,.06),rgba(245,158,11,.06));border:1px solid rgba(239,68,68,.2);border-radius:14px;padding:16px 24px;font-size:.875rem;color:var(--text-muted);line-height:1.6}
+.urgency-text-inner strong{color:#fca5a5}
+/* Admin pricing control */
+.pricing-ctrl-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--glass-border)}
+.pricing-ctrl-row:last-child{border-bottom:none}
+.pricing-ctrl-label{font-size:.82rem;color:var(--text-muted)}
+.pricing-ctrl-val{font-size:.88rem;font-weight:600;color:var(--text)}
+.pricing-count-input{width:70px;background:rgba(255,255,255,.06);border:1px solid var(--glass-border);border-radius:7px;padding:5px 10px;color:var(--text);font-family:'Inter',sans-serif;font-size:.875rem;text-align:center;outline:none}
+.pricing-count-input:focus{border-color:var(--primary)}
+.pricing-phase-toggle{position:relative;width:40px;height:22px;flex-shrink:0;cursor:pointer}
+.pricing-phase-toggle input{display:none}
+.ppt-track{position:absolute;inset:0;border-radius:11px;background:rgba(255,255,255,.12);transition:background .2s}
+.pricing-phase-toggle input:checked + .ppt-track{background:var(--success)}
+.ppt-thumb{position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .2s;pointer-events:none}
+.pricing-phase-toggle input:checked ~ .ppt-thumb{left:21px}
+</style>
+</head>
+<body>
+<div class="orbs"><div class="orb orb1"></div><div class="orb orb2"></div><div class="orb orb3"></div></div>
+
+<!-- ════ NAVBAR ════ -->
+<nav id="navbar">
+  <div class="nav-logo" onclick="showSection('home')">RateRadar</div>
+  <div class="nav-links">
+    <button class="nav-link active" data-section="home">Accueil</button>
+    <button class="nav-link" data-section="features">Fonctionnalités</button>
+    <button class="nav-link" data-section="pricing">Tarifs</button>
+    <button class="nav-link" data-section="faq">FAQ</button>
+    <button class="nav-link" data-section="contact">Contact</button>
+  </div>
+  <div class="nav-auth" id="nav-auth">
+    <button class="btn-ghost" onclick="openModal('login')">Se connecter</button>
+    <button class="btn-primary" onclick="openModal('register')">Créer un compte</button>
+  </div>
+  <div class="user-menu" id="user-menu" style="display:none">
+    <div class="user-avatar-btn" onclick="toggleDropdown()">
+      <div class="avatar-circle" id="nav-av"></div>
+      <span class="user-name-nav" id="nav-username"></span>
+      <span class="dropdown-arrow">▼</span>
+    </div>
+    <div class="user-dropdown" id="user-dropdown">
+      <button class="dropdown-item" onclick="showSection('home');closeDropdown()">Mon compte</button>
+      <button class="dropdown-item danger" onclick="logout()">Déconnexion</button>
+    </div>
+  </div>
+</nav>
+
+<!-- ════ MAIN ════ -->
+<main>
+
+<!-- ── HOME ── -->
+<div id="section-home" class="section active">
+
+  <!-- HERO -->
+  <section id="hero">
+    <div class="hero-content">
+      <div class="hero-badge">🔴 LIVE — Surveillance en temps réel</div>
+      <h1 class="hero-h1">
+        <span id="hero-headline">Vos concurrents baissent leurs prix ce soir.</span><br>
+        <span class="grad">Le savez-vous&nbsp;?</span>
+      </h1>
+      <p class="hero-sub" id="hero-subheadline">RateRadar surveille les tarifs de vos concurrents sur Booking.com en temps réel. Recevez une alerte dès qu'un prix change.</p>
+      <div class="hero-btns">
+        <button class="btn-primary btn-lg" onclick="openModal('register')">Essai gratuit 14 jours</button>
+        <button class="btn-ghost-lg" onclick="showSection('features')">Voir la démo →</button>
+      </div>
+      <div id="hero-urgency-banner">
+        <div class="urgency-banner-inner">
+          <span class="urgency-fire">🔥</span>
+          Prix de lancement — Plus que
+          <span class="urgency-spots" id="urgency-spots-count">10</span>
+          places disponibles
+        </div>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="price-card pc1">
+        <div class="price-card-header"><div class="hotel-dot" style="background:#3B82F6"></div><span class="hotel-name">Hotel Amigo Brussels</span></div>
+        <div class="price-row"><span class="price-label">Ce soir</span><span class="price-val">€189</span></div>
+        <div class="price-row"><span class="price-label">Demain</span><span class="price-val">€175</span></div>
+        <span class="badge-drop">Prix baissé -12% ↓</span>
+      </div>
+      <div class="price-card pc2">
+        <div class="price-card-header"><div class="hotel-dot" style="background:#8B5CF6"></div><span class="hotel-name">Le Châtelain</span></div>
+        <div class="price-row"><span class="price-label">Ce soir</span><span class="price-val">€210</span></div>
+        <div class="price-row"><span class="price-label">Demain</span><span class="price-val">€220</span></div>
+        <span class="badge-rise">Prix monté +5% ↑</span>
+      </div>
+      <div class="price-card pc3">
+        <div class="price-card-header"><div class="hotel-dot" style="background:#10B981"></div><span class="hotel-name">Meininger Brussels</span></div>
+        <div class="price-row"><span class="price-label">Ce soir</span><span class="price-val">€129</span></div>
+        <div class="price-row"><span class="price-label">Demain</span><span class="price-val">€119</span></div>
+        <span class="badge-drop">Prix baissé -8% ↓</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- SOCIAL PROOF -->
+  <div class="social-proof">
+    <div class="social-proof-inner">
+      <p class="proof-hotels" id="proof-text"><strong>Déjà utilisé par 50+ hôtels indépendants</strong> en Belgique et en France</p>
+      <div class="stars">★★★★★</div>
+      <p class="proof-rating" id="proof-rating"><strong>4.9/5</strong> — noté par des directeurs d'hôtels</p>
+    </div>
+  </div>
+
+  <!-- PROBLEM -->
+  <div class="section-block">
+    <div class="center reveal">
+      <p class="section-label">Le problème</p>
+      <h2 class="section-h2" id="problem-headline">Vous perdez des réservations sans le savoir</h2>
+    </div>
+    <div class="pain-grid">
+      <div class="pain-card reveal">
+        <span class="pain-emoji">🚨</span>
+        <div class="pain-title" id="pain1-title">Réaction trop tardive</div>
+        <p class="pain-text" id="pain1-text">Votre concurrent a baissé ses prix hier soir. Vous l'avez su trop tard.</p>
+      </div>
+      <div class="pain-card reveal">
+        <span class="pain-emoji">⏱️</span>
+        <div class="pain-title" id="pain2-title">Perte de temps quotidienne</div>
+        <p class="pain-text" id="pain2-text">Vous passez 2h par jour à vérifier manuellement Booking.com.</p>
+      </div>
+      <div class="pain-card reveal">
+        <span class="pain-emoji">💸</span>
+        <div class="pain-title" id="pain3-title">Désavantage concurrentiel</div>
+        <p class="pain-text" id="pain3-text">Vous êtes l'hôtel le plus cher de la page — sans le réaliser.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- SOLUTION -->
+  <div class="section-block" style="background:var(--bg2);border-radius:32px;max-width:1140px;padding:80px 50px;">
+    <div class="center reveal">
+      <p class="section-label">La solution</p>
+      <h2 class="section-h2" id="solution-headline">RateRadar surveille vos concurrents 24h/24, 7j/7</h2>
+    </div>
+    <div class="solution-grid" style="margin-top:50px;">
+      <div class="sol-card reveal">
+        <div class="sol-icon">📊</div>
+        <div class="sol-title" id="sol1-title">Suivi des prix en temps réel</div>
+        <p class="sol-text" id="sol1-text">Visualisez instantanément les tarifs de tous vos concurrents sur Booking.com, mis à jour en continu.</p>
+      </div>
+      <div class="sol-card reveal">
+        <div class="sol-icon">🔔</div>
+        <div class="sol-title" id="sol2-title">Alertes instantanées par email</div>
+        <p class="sol-text" id="sol2-text">Recevez une notification dès qu'un concurrent modifie son tarif. Réagissez en minutes, pas en heures.</p>
+      </div>
+      <div class="sol-card reveal">
+        <div class="sol-icon">📈</div>
+        <div class="sol-title" id="sol3-title">Historique 30 jours des prix</div>
+        <p class="sol-text" id="sol3-text">Analysez les tendances tarifaires sur le dernier mois pour anticiper les prochains mouvements du marché.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- HOW IT WORKS -->
+  <div class="section-block">
+    <div class="center reveal">
+      <p class="section-label">Comment ça marche</p>
+      <h2 class="section-h2" id="how-headline">Opérationnel en moins de 5 minutes</h2>
+    </div>
+    <div class="steps">
+      <div class="step reveal">
+        <div class="step-num">1</div>
+        <div class="step-title" id="step1-title">Ajoutez vos concurrents</div>
+        <p class="step-text" id="step1-text">Entrez les URLs Booking.com de vos concurrents. Simple comme bonjour.</p>
+      </div>
+      <div class="step reveal">
+        <div class="step-num">2</div>
+        <div class="step-title" id="step2-title">On scrape leurs prix chaque jour</div>
+        <p class="step-text" id="step2-text">Nos robots analysent automatiquement les tarifs de vos concurrents, 24h/24.</p>
+      </div>
+      <div class="step reveal">
+        <div class="step-num">3</div>
+        <div class="step-title" id="step3-title">Vous recevez les insights</div>
+        <p class="step-text" id="step3-text">Chaque matin, un rapport complet dans votre boîte mail. Plus jamais de mauvaise surprise.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- TESTIMONIALS -->
+  <div class="section-block">
+    <div class="center reveal">
+      <p class="section-label">Témoignages</p>
+      <h2 class="section-h2">Ce que disent nos clients</h2>
+    </div>
+    <div class="testi-grid" id="testi-grid">
+      <!-- injected by JS -->
+    </div>
+  </div>
+
+  <!-- CTA BANNER -->
+  <div class="cta-banner reveal">
+    <h2 id="cta-headline">Arrêtez de deviner. <span class="grad">Commencez à gagner.</span></h2>
+    <p id="cta-sub">Rejoignez 50+ hôtels qui dominent déjà leur marché grâce à RateRadar.</p>
+    <button class="btn-primary btn-lg" onclick="openModal('register')" id="cta-btn-text">Démarrer l'essai gratuit</button>
+  </div>
+
+</div><!-- /home -->
+
+<!-- ── FEATURES ── -->
+<div id="section-features" class="section">
+  <div class="feat-hero reveal">
+    <p class="section-label">Fonctionnalités</p>
+    <h1 class="section-h2" style="font-size:clamp(1.8rem,4vw,3rem);" id="feat-headline">Tout ce dont vous avez besoin pour dominer votre marché</h1>
+  </div>
+  <div class="feat-blocks">
+
+    <div class="feat-block reveal">
+      <div class="feat-mockup">
+        <div class="mock-bar"><div class="mock-dot" style="background:#EF4444"></div><div class="mock-dot" style="background:#F59E0B"></div><div class="mock-dot" style="background:#10B981"></div></div>
+        <div class="mock-row w60" style="margin-bottom:8px;"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;">
+          <div style="background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.2);border-radius:8px;padding:10px;text-align:center;"><div style="font-size:.7rem;color:var(--text-muted);margin-bottom:4px;">Hotel A</div><div style="font-size:1rem;font-weight:700;">€189</div><div style="font-size:.65rem;color:#EF4444;">↓ -12%</div></div>
+          <div style="background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.2);border-radius:8px;padding:10px;text-align:center;"><div style="font-size:.7rem;color:var(--text-muted);margin-bottom:4px;">Hotel B</div><div style="font-size:1rem;font-weight:700;">€210</div><div style="font-size:.65rem;color:#10B981;">↑ +5%</div></div>
+          <div style="background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.2);border-radius:8px;padding:10px;text-align:center;"><div style="font-size:.7rem;color:var(--text-muted);margin-bottom:4px;">Vous</div><div style="font-size:1rem;font-weight:700;color:#10B981;">€195</div><div style="font-size:.65rem;color:#10B981;">Optimal</div></div>
+        </div>
+        <div class="mock-chart"><div class="bar-col" style="height:60%"></div><div class="bar-col" style="height:80%"></div><div class="bar-col" style="height:50%"></div><div class="bar-col" style="height:90%"></div><div class="bar-col" style="height:70%"></div><div class="bar-col" style="height:85%"></div><div class="bar-col" style="height:65%"></div></div>
+      </div>
+      <div class="feat-info">
+        <p class="feat-tag">Fonctionnalité 01</p>
+        <h3 class="feat-title" id="f1-title">Suivi des prix en temps réel</h3>
+        <p class="feat-desc" id="f1-desc">Surveillez chaque mouvement tarifaire de vos concurrents dès qu'il se produit. Notre technologie scrape Booking.com en continu pour vous donner une vue complète du marché.</p>
+        <ul class="feat-bullets" id="f1-bullets">
+          <li>Données mises à jour toutes les heures en plan Pro</li>
+          <li>Comparaison visuelle avec votre propre tarif</li>
+          <li>Indicateurs de tendance (hausse / baisse / stable)</li>
+          <li>Tableau de bord centralisé pour tous vos concurrents</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="feat-block reverse reveal">
+      <div class="feat-mockup">
+        <div class="mock-bar"><div class="mock-dot" style="background:#EF4444"></div><div class="mock-dot" style="background:#F59E0B"></div><div class="mock-dot" style="background:#10B981"></div></div>
+        <div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:12px;padding:16px;margin-bottom:12px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;"><span style="font-size:1.2rem;">🚨</span><span style="font-weight:700;font-size:.9rem;">Alerte prix détectée</span></div>
+          <p style="font-size:.8rem;color:var(--text-muted);">Hotel Amigo Brussels a baissé son tarif de €189 à <strong style="color:#EF4444;">€165 (-13%)</strong></p>
+          <div style="margin-top:10px;font-size:.72rem;color:var(--text-muted);">il y a 2 minutes • Booking.com</div>
+        </div>
+        <div class="mock-row" style="margin-bottom:8px;"></div>
+        <div class="mock-row w80" style="margin-bottom:8px;"></div>
+        <div class="mock-row w40"></div>
+      </div>
+      <div class="feat-info">
+        <p class="feat-tag">Fonctionnalité 02</p>
+        <h3 class="feat-title" id="f2-title">Alertes intelligentes</h3>
+        <p class="feat-desc" id="f2-desc">Ne manquez plus jamais un mouvement stratégique. Définissez des seuils personnalisés et recevez des alertes instantanées par email ou SMS dès qu'un concurrent bouge ses prix.</p>
+        <ul class="feat-bullets" id="f2-bullets">
+          <li>Alertes email instantanées (tous plans)</li>
+          <li>Alertes SMS en temps réel (plan Pro+)</li>
+          <li>Seuils personnalisables par concurrent</li>
+          <li>Résumé quotidien à l'heure de votre choix</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="feat-block reveal">
+      <div class="feat-mockup">
+        <div class="mock-bar"><div class="mock-dot" style="background:#EF4444"></div><div class="mock-dot" style="background:#F59E0B"></div><div class="mock-dot" style="background:#10B981"></div></div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:8px;">
+          <div style="display:flex;justify-content:space-between;font-size:.72rem;color:var(--text-muted);padding:0 4px;"><span>Lun</span><span>Mar</span><span>Mer</span><span>Jeu</span><span>Ven</span><span>Sam</span><span>Dim</span></div>
+          <div style="flex:1;display:flex;align-items:flex-end;gap:6px;padding:8px;background:rgba(59,130,246,.05);border:1px solid rgba(59,130,246,.1);border-radius:10px;">
+            <div style="flex:1;height:55%;background:linear-gradient(180deg,#3B82F6,#8B5CF6);border-radius:3px 3px 0 0;opacity:.8;"></div>
+            <div style="flex:1;height:70%;background:linear-gradient(180deg,#3B82F6,#8B5CF6);border-radius:3px 3px 0 0;opacity:.8;"></div>
+            <div style="flex:1;height:45%;background:linear-gradient(180deg,#3B82F6,#8B5CF6);border-radius:3px 3px 0 0;opacity:.8;"></div>
+            <div style="flex:1;height:85%;background:linear-gradient(180deg,#3B82F6,#8B5CF6);border-radius:3px 3px 0 0;opacity:.8;"></div>
+            <div style="flex:1;height:90%;background:linear-gradient(180deg,#EF4444,#F59E0B);border-radius:3px 3px 0 0;opacity:.9;"></div>
+            <div style="flex:1;height:75%;background:linear-gradient(180deg,#3B82F6,#8B5CF6);border-radius:3px 3px 0 0;opacity:.8;"></div>
+            <div style="flex:1;height:60%;background:linear-gradient(180deg,#3B82F6,#8B5CF6);border-radius:3px 3px 0 0;opacity:.8;"></div>
+          </div>
+        </div>
+      </div>
+      <div class="feat-info">
+        <p class="feat-tag">Fonctionnalité 03</p>
+        <h3 class="feat-title" id="f3-title">Historique &amp; tendances</h3>
+        <p class="feat-desc" id="f3-desc">Remontez dans le temps pour analyser les stratégies tarifaires de vos concurrents. Identifiez les patterns saisonniers et anticipez les prochains mouvements de prix.</p>
+        <ul class="feat-bullets" id="f3-bullets">
+          <li>Historique 30 jours (Starter), 90 jours (Pro), illimité (Premium)</li>
+          <li>Graphiques de tendances interactifs</li>
+          <li>Détection automatique des patterns saisonniers</li>
+          <li>Export des données en CSV</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="feat-block reverse reveal">
+      <div class="feat-mockup">
+        <div class="mock-bar"><div class="mock-dot" style="background:#EF4444"></div><div class="mock-dot" style="background:#F59E0B"></div><div class="mock-dot" style="background:#10B981"></div></div>
+        <div style="background:rgba(139,92,246,.08);border:1px solid rgba(139,92,246,.2);border-radius:12px;padding:16px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;"><span style="font-size:1.1rem;">📋</span><span style="font-weight:700;font-size:.9rem;">Rapport semaine 17</span><span style="font-size:.7rem;color:var(--primary);background:rgba(59,130,246,.1);padding:2px 8px;border-radius:4px;">Pro+</span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div style="background:rgba(255,255,255,.04);border-radius:8px;padding:10px;"><div style="font-size:.7rem;color:var(--text-muted);margin-bottom:3px;">Opportunités</div><div style="font-size:1.2rem;font-weight:700;color:#10B981;">+8</div></div>
+            <div style="background:rgba(255,255,255,.04);border-radius:8px;padding:10px;"><div style="font-size:.7rem;color:var(--text-muted);margin-bottom:3px;">Alertes</div><div style="font-size:1.2rem;font-weight:700;color:#EF4444;">3</div></div>
+            <div style="background:rgba(255,255,255,.04);border-radius:8px;padding:10px;"><div style="font-size:.7rem;color:var(--text-muted);margin-bottom:3px;">Avg concurrent</div><div style="font-size:1.2rem;font-weight:700;">€187</div></div>
+            <div style="background:rgba(255,255,255,.04);border-radius:8px;padding:10px;"><div style="font-size:.7rem;color:var(--text-muted);margin-bottom:3px;">Votre tarif</div><div style="font-size:1.2rem;font-weight:700;color:#10B981;">€195</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="feat-info">
+        <p class="feat-tag">Fonctionnalité 04 — Pro+</p>
+        <h3 class="feat-title" id="f4-title">Rapport hebdomadaire</h3>
+        <p class="feat-desc" id="f4-desc">Chaque semaine, recevez un rapport complet avec l'analyse du marché, les opportunités détectées et les recommandations tarifaires personnalisées pour votre établissement.</p>
+        <ul class="feat-bullets" id="f4-bullets">
+          <li>Synthèse des mouvements de la semaine</li>
+          <li>Recommandations tarifaires basées sur les données</li>
+          <li>Identification des événements locaux impactant les prix</li>
+          <li>Score de compétitivité de votre établissement</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</div><!-- /features -->
+
+<!-- ── PRICING ── -->
+<div id="section-pricing" class="section">
+  <div class="pricing-hero reveal">
+    <p class="section-label">Tarifs</p>
+    <h1 class="section-h2" style="font-size:clamp(1.8rem,4vw,3rem);" id="pricing-headline">Tarifs simples. ROI immédiat.</h1>
+    <p class="section-sub center" id="pricing-sub" style="margin-top:14px;">Commencez gratuitement pendant 14 jours, sans carte bancaire.</p>
+    <div class="toggle-wrap">
+      <span class="toggle-label active" id="lbl-monthly">Mensuel</span>
+      <div class="toggle-switch" id="billing-toggle" onclick="toggleBilling()"><div class="toggle-knob"></div></div>
+      <span class="toggle-label" id="lbl-annual">Annuel</span>
+      <span class="badge-save">-20%</span>
+    </div>
+  </div>
+  <div class="plans-grid" id="plans-grid"><!-- injected by JS --></div>
+  <div id="launch-urgency-text">
+    <div class="urgency-text-inner">
+      ⏳ <strong>Les prix augmentent dès que les 10 premières places sont prises.</strong><br>
+      Aucune exception. Les early adopters gardent leur prix à vie.
+    </div>
+  </div>
+</div><!-- /pricing -->
+
+<!-- ── FAQ ── -->
+<div id="section-faq" class="section">
+  <div class="faq-hero reveal center">
+    <p class="section-label">FAQ</p>
+    <h1 class="section-h2" style="font-size:clamp(1.8rem,4vw,3rem);" id="faq-headline">Questions fréquentes</h1>
+    <p class="section-sub center" id="faq-sub" style="margin-top:12px;">Tout ce que vous devez savoir avant de commencer.</p>
+  </div>
+  <div class="faq-list" id="faq-list"><!-- injected by JS --></div>
+</div><!-- /faq -->
+
+<!-- ── CONTACT ── -->
+<div id="section-contact" class="section">
+  <div class="contact-wrap">
+    <div class="contact-info-block reveal">
+      <div>
+        <p class="section-label">Contact</p>
+        <h2 class="contact-h2" id="contact-headline">Parlons de votre hôtel</h2>
+        <p class="contact-sub" id="contact-sub">Notre équipe est disponible pour répondre à toutes vos questions et vous aider à démarrer.</p>
+      </div>
+      <div class="contact-item">
+        <div class="contact-icon">✉️</div>
+        <div><div class="contact-item-label">Email</div><div class="contact-item-val" id="contact-email">hello@rateradar.io</div></div>
+      </div>
+      <div class="contact-item">
+        <div class="contact-icon">📍</div>
+        <div><div class="contact-item-label">Adresse</div><div class="contact-item-val" id="contact-address">Avenue Louise 54, 1050 Bruxelles, Belgique</div></div>
+      </div>
+      <div class="contact-item">
+        <div class="contact-icon">🕐</div>
+        <div><div class="contact-item-label">Horaires</div><div class="contact-item-val" id="contact-hours">Lun – Ven, 9h00 – 18h00</div></div>
+      </div>
+    </div>
+    <div class="contact-form reveal">
+      <h3 style="font-size:1.2rem;font-weight:700;margin-bottom:6px;">Envoyez-nous un message</h3>
+      <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:24px;">Réponse garantie sous 24h.</p>
+      <div class="form-group"><label class="form-label">Nom complet</label><input id="ct-name" type="text" class="form-input" placeholder="Marie Dupont"></div>
+      <div class="form-group"><label class="form-label">Email</label><input id="ct-email" type="email" class="form-input" placeholder="marie@hotel.com"></div>
+      <div class="form-group"><label class="form-label">Votre hôtel</label><input id="ct-hotel" type="text" class="form-input" placeholder="Hôtel des Alpes"></div>
+      <div class="form-group"><label class="form-label">Message</label><textarea id="ct-message" class="form-input" placeholder="Dites-nous comment nous pouvons vous aider..."></textarea></div>
+      <div class="msg-error" id="ct-error" style="margin-bottom:12px;"></div>
+      <button class="form-submit" id="ct-submit" onclick="submitContact(event)">Envoyer le message →</button>
+    </div>
+  </div>
+</div><!-- /contact -->
+
+</main><!-- /main -->
+
+<!-- ════ FOOTER ════ -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <div class="footer-logo">RateRadar</div>
+        <p class="footer-tagline" id="footer-tagline">La veille tarifaire automatisée pour les hôtels indépendants qui veulent garder une longueur d'avance.</p>
+      </div>
+      <div>
+        <div class="footer-col-title">Produit</div>
+        <ul class="footer-links">
+          <li><a onclick="showSection('features')">Fonctionnalités</a></li>
+          <li><a onclick="showSection('pricing')">Tarifs</a></li>
+          <li><a onclick="openModal('register')">Essai gratuit</a></li>
+        </ul>
+      </div>
+      <div>
+        <div class="footer-col-title">Support</div>
+        <ul class="footer-links">
+          <li><a onclick="showSection('faq')">FAQ</a></li>
+          <li><a onclick="showSection('contact')">Contact</a></li>
+          <li><a>Documentation</a></li>
+        </ul>
+      </div>
+      <div>
+        <div class="footer-col-title">Légal</div>
+        <ul class="footer-links">
+          <li><a>Mentions légales</a></li>
+          <li><a>CGU</a></li>
+          <li><a>Confidentialité</a></li>
+          <li><a>Cookies</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span class="footer-copy">© 2026 <span>RateRadar</span>. Tous droits réservés.</span>
+      <span class="footer-copy">Fait avec ❤️ à Bruxelles</span>
+    </div>
+  </div>
+</footer>
+
+<!-- ════ PAYMENT MODAL ════ -->
+<div id="payment-modal" onclick="closePayModalOverlay(event)">
+  <div class="pay-modal">
+    <div class="pay-header">
+      <div class="pay-header-left">
+        <h3>Finaliser votre abonnement</h3>
+        <p>Essai gratuit 14 jours · Annulez à tout moment</p>
+      </div>
+      <button class="pay-close" onclick="closePayModal()">✕</button>
+    </div>
+
+    <!-- form view -->
+    <div class="pay-form-wrap" id="pay-form-wrap">
+      <div class="pay-body">
+        <!-- left: summary -->
+        <div class="pay-summary">
+          <div class="pay-sum-title">Votre plan</div>
+          <div>
+            <div class="pay-plan-name" id="pay-plan-name">PRO</div>
+            <div id="pay-plan-badge-wrap"><span class="pay-plan-badge" id="pay-plan-badge">Le plus populaire</span></div>
+          </div>
+          <div class="pay-divider"></div>
+          <div class="pay-price-line"><span>Tarif</span><span id="pay-price-display">€299/mois</span></div>
+          <div class="pay-price-line"><span>Facturation</span><span id="pay-billing-period">Mensuelle</span></div>
+          <div class="pay-price-line"><span>Essai gratuit</span><span style="color:#10B981">14 jours</span></div>
+          <div class="pay-divider"></div>
+          <div class="pay-total-line"><span>Total aujourd'hui</span><span>€0</span></div>
+          <div class="pay-trial-badge">🎁 Aucun prélèvement pendant 14 jours.<br>Résiliez avant la fin de l'essai sans frais.</div>
+        </div>
+
+        <!-- right: card form -->
+        <div class="pay-form">
+          <div class="pay-form-title">Informations de paiement</div>
+          <div class="pay-field">
+            <label class="pay-label">Titulaire de la carte</label>
+            <input class="pay-input" id="pay-name" placeholder="Marie Dupont" autocomplete="cc-name">
+          </div>
+          <div class="pay-field card-type-icon" style="position:relative;">
+            <label class="pay-label">Numéro de carte</label>
+            <input class="pay-input" id="pay-card" placeholder="1234 5678 9012 3456" maxlength="19" autocomplete="cc-number" oninput="formatCard(this)" inputmode="numeric">
+            <span class="card-brand" id="card-brand"></span>
+          </div>
+          <div class="pay-row">
+            <div class="pay-field">
+              <label class="pay-label">Expiration</label>
+              <input class="pay-input" id="pay-expiry" placeholder="MM / AA" maxlength="7" oninput="formatExpiry(this)" inputmode="numeric">
+            </div>
+            <div class="pay-field">
+              <label class="pay-label">CVV</label>
+              <input class="pay-input" id="pay-cvv" placeholder="123" maxlength="4" inputmode="numeric">
+            </div>
+          </div>
+          <div class="pay-field">
+            <label class="pay-label">Email de facturation</label>
+            <input class="pay-input" id="pay-email" placeholder="marie@hotel.com" type="email" autocomplete="email">
+          </div>
+          <div class="msg-error" id="pay-error" style="margin-bottom:12px;"></div>
+          <button class="pay-btn" id="pay-submit-btn" onclick="processPayment()">
+            <span id="pay-btn-text">Démarrer l'essai gratuit 🔒</span>
+          </button>
+          <div class="pay-security"><span>🔒</span> Paiement sécurisé SSL 256-bit</div>
+          <div class="pay-methods">
+            <span class="pay-method">VISA</span>
+            <span class="pay-method">MASTERCARD</span>
+            <span class="pay-method">AMEX</span>
+            <span class="pay-method">CB</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- success view -->
+    <div class="pay-success" id="pay-success">
+      <div class="pay-success-icon">🎉</div>
+      <div class="pay-success-title">Bienvenue sur RateRadar !</div>
+      <p class="pay-success-text">Votre essai gratuit de 14 jours commence maintenant.<br>Vous recevrez un email de confirmation avec vos accès dans les prochaines minutes.</p>
+      <button class="btn-primary" style="margin-top:28px;padding:13px 32px;" onclick="closePayModal()">Accéder à mon tableau de bord →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════ AUTH MODAL ════ -->
+<div class="modal-overlay" id="auth-modal" onclick="closeModalOverlay(event)">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div class="modal-tabs">
+      <button class="modal-tab active" id="tab-login-btn" onclick="switchModalTab('login')">Connexion</button>
+      <button class="modal-tab" id="tab-register-btn" onclick="switchModalTab('register')">Créer un compte</button>
+    </div>
+    <!-- LOGIN -->
+    <div class="modal-form-panel active" id="panel-login">
+      <h2 class="modal-title">Bon retour 👋</h2>
+      <p class="modal-subtitle">Connectez-vous à votre compte RateRadar</p>
+      <div class="msg-error" id="login-error"></div>
+      <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="login-email" placeholder="vous@hotel.com"></div>
+      <div class="form-group"><label class="form-label">Mot de passe</label><input type="password" class="form-input" id="login-pwd" placeholder="••••••••"></div>
+      <button class="form-submit" onclick="doLogin()">Se connecter →</button>
+    </div>
+    <!-- REGISTER -->
+    <div class="modal-form-panel" id="panel-register">
+      <h2 class="modal-title">Créer un compte</h2>
+      <p class="modal-subtitle">14 jours gratuits, sans carte bancaire</p>
+      <div class="msg-error" id="register-error"></div>
+      <div class="msg-success" id="register-success"></div>
+      <div class="form-group"><label class="form-label">Nom complet</label><input type="text" class="form-input" id="reg-name" placeholder="Marie Dupont"></div>
+      <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="reg-email" placeholder="marie@hotel.com"></div>
+      <div class="form-group"><label class="form-label">Mot de passe</label><input type="password" class="form-input" id="reg-pwd" placeholder="Min. 6 caractères"></div>
+      <button class="form-submit" onclick="doRegister()">Créer mon compte →</button>
+    </div>
+
+    <!-- CONFIRMATION SENT SCREEN -->
+    <div class="modal-form-panel" id="panel-confirm">
+      <div class="confirm-screen">
+        <span class="confirm-icon">📬</span>
+        <div class="confirm-title">Vérifiez votre boîte mail</div>
+        <p class="confirm-text">Un email de confirmation a été envoyé à :</p>
+        <div class="confirm-email-tag" id="confirm-email-display">—</div>
+        <p class="confirm-text" style="margin-bottom:4px;">Cliquez sur le lien dans l'email pour activer votre compte.</p>
+        <div class="confirm-dev-box">
+          <div class="confirm-dev-label">⚡ Lien de confirmation (démo)</div>
+          <div class="confirm-dev-link" id="confirm-dev-link-text"></div>
+        </div>
+        <button class="confirm-resend" onclick="resendConfirmation()">Renvoyer l'email</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════ ADMIN BUTTON ════ -->
+<button id="admin-btn" onclick="toggleAdmin()">⚙ Admin Panel</button>
+
+<!-- ════ ADMIN PANEL ════ -->
+<div id="admin-panel">
+  <div class="ap-header">
+    <div class="ap-title">Admin Panel <span>ADMIN</span></div>
+    <button class="ap-close" onclick="toggleAdmin()">✕</button>
+  </div>
+  <div class="ap-tabs">
+    <button class="ap-tab active" onclick="switchApTab('contenu')">Contenu</button>
+    <button class="ap-tab" onclick="switchApTab('tarifs')">Tarifs</button>
+    <button class="ap-tab" onclick="switchApTab('design')">Design</button>
+    <button class="ap-tab" onclick="switchApTab('users')">Utilisateurs</button>
+    <button class="ap-tab" onclick="switchApTab('pricing')">🚀 Prix</button>
+  </div>
+  <div class="ap-body">
+
+    <!-- TAB: CONTENU -->
+    <div class="ap-panel active" id="ap-contenu">
+      <p class="ap-section-title">Héro</p>
+      <div class="ap-field"><label class="ap-label">Titre principal</label><input class="ap-input" id="ae-hero-headline" oninput="liveEdit('hero-headline',this.value)"></div>
+      <div class="ap-field"><label class="ap-label">Sous-titre</label><textarea class="ap-input" id="ae-hero-sub" oninput="liveEdit('hero-subheadline',this.value)"></textarea></div>
+
+      <p class="ap-section-title">Preuve sociale</p>
+      <div class="ap-field"><label class="ap-label">Texte hôtels</label><input class="ap-input" id="ae-proof-text" oninput="liveEditHTML('proof-text',this.value)"></div>
+      <div class="ap-field"><label class="ap-label">Note</label><input class="ap-input" id="ae-proof-rating" oninput="liveEditHTML('proof-rating',this.value)"></div>
+
+      <p class="ap-section-title">Problème</p>
+      <div class="ap-field"><label class="ap-label">Titre section</label><input class="ap-input" id="ae-problem-headline" oninput="liveEdit('problem-headline',this.value)"></div>
+      <div class="ap-field"><label class="ap-label">Pain 1 — titre</label><input class="ap-input" id="ae-pain1-title" oninput="liveEdit('pain1-title',this.value)"></div>
+      <div class="ap-field"><label class="ap-label">Pain 1 — texte</label><textarea class="ap-input" id="ae-pain1-text" oninput="liveEdit('pain1-text',this.value)"></textarea></div>
+      <div class="ap-field"><label class="ap-label">Pain 2 — titre</label><input class="ap-input" id="ae-pain2-title" oninput="liveEdit('pain2-title',this.value)"></div>
+      <div class="ap-field"><label class="ap-label">Pain 2 — texte</label><textarea class="ap-input" id="ae-pain2-text" oninput="liveEdit('pain2-text',this.value)"></textarea></div>
+      <div class="ap-field"><label class="ap-label">Pain 3 — titre</label><input class="ap-input" id="ae-pain3-title" oninput="liveEdit('pain3-title',this.value)"></div>
+      <div class="ap-field"><label class="ap-label">Pain 3 — texte</label><textarea class="ap-input" id="ae-pain3-text" oninput="liveEdit('pain3-text',this.value)"></textarea></div>
+
+      <p class="ap-section-title">Témoignages</p>
+      <div id="ae-testimonials"></div>
+
+      <p class="ap-section-title">Contact</p>
+      <div class="ap-field"><label class="ap-label">Titre</label><input class="ap-input" id="ae-contact-headline" oninput="liveEdit('contact-headline',this.value)"></div>
+      <div class="ap-field"><label class="ap-label">Sous-titre</label><textarea class="ap-input" id="ae-contact-sub" oninput="liveEdit('contact-sub',this.value)"></textarea></div>
+      <div class="ap-field"><label class="ap-label">Email</label><input class="ap-input" id="ae-contact-email" oninput="liveEdit('contact-email',this.value)"></div>
+      <div class="ap-field"><label class="ap-label">Adresse</label><input class="ap-input" id="ae-contact-address" oninput="liveEdit('contact-address',this.value)"></div>
+      <div class="ap-field"><label class="ap-label">Horaires</label><input class="ap-input" id="ae-contact-hours" oninput="liveEdit('contact-hours',this.value)"></div>
+
+      <p class="ap-section-title">Footer</p>
+      <div class="ap-field"><label class="ap-label">Tagline</label><textarea class="ap-input" id="ae-footer-tagline" oninput="liveEdit('footer-tagline',this.value)"></textarea></div>
+
+      <button class="ap-save-btn" onclick="saveContent()">💾 Sauvegarder le contenu</button>
+    </div>
+
+    <!-- TAB: TARIFS -->
+    <div class="ap-panel" id="ap-tarifs">
+      <div id="ae-plans"></div>
+      <button class="ap-save-btn" onclick="savePlans()">💾 Sauvegarder les tarifs</button>
+    </div>
+
+    <!-- TAB: DESIGN -->
+    <div class="ap-panel" id="ap-design">
+      <p class="ap-section-title">Couleurs</p>
+      <div class="color-row">
+        <div class="color-field">
+          <label class="ap-label">Couleur primaire</label>
+          <div class="color-swatch"><input type="color" id="dc-primary" value="#3B82F6" oninput="applyColor('primary',this.value);document.getElementById('dc-primary-hex').value=this.value"><input class="ap-input" id="dc-primary-hex" value="#3B82F6" oninput="document.getElementById('dc-primary').value=this.value;applyColor('primary',this.value)"></div>
+        </div>
+        <div class="color-field">
+          <label class="ap-label">Couleur secondaire</label>
+          <div class="color-swatch"><input type="color" id="dc-secondary" value="#8B5CF6" oninput="applyColor('secondary',this.value);document.getElementById('dc-secondary-hex').value=this.value"><input class="ap-input" id="dc-secondary-hex" value="#8B5CF6" oninput="document.getElementById('dc-secondary').value=this.value;applyColor('secondary',this.value)"></div>
+        </div>
+        <div class="color-field">
+          <label class="ap-label">Background principal</label>
+          <div class="color-swatch"><input type="color" id="dc-bg" value="#050A18" oninput="applyColor('bg',this.value);document.getElementById('dc-bg-hex').value=this.value"><input class="ap-input" id="dc-bg-hex" value="#050A18" oninput="document.getElementById('dc-bg').value=this.value;applyColor('bg',this.value)"></div>
+        </div>
+        <div class="color-field">
+          <label class="ap-label">Background secondaire</label>
+          <div class="color-swatch"><input type="color" id="dc-bg2" value="#0A1128" oninput="applyColor('bg2',this.value);document.getElementById('dc-bg2-hex').value=this.value"><input class="ap-input" id="dc-bg2-hex" value="#0A1128" oninput="document.getElementById('dc-bg2').value=this.value;applyColor('bg2',this.value)"></div>
+        </div>
+      </div>
+      <p class="ap-section-title" style="margin-top:24px;">Héro</p>
+      <div class="ap-field">
+        <label class="ap-label">Style héro (dark / gradient / image)</label>
+        <select class="ap-input" id="dc-hero-style" onchange="applyHeroStyle(this.value)">
+          <option value="dark">Dark (défaut)</option>
+          <option value="gradient">Gradient bleu-violet</option>
+          <option value="image">Image de fond</option>
+        </select>
+      </div>
+      <div class="ap-field" id="hero-img-field" style="display:none">
+        <label class="ap-label">URL image de fond</label>
+        <input class="ap-input" id="dc-hero-img" placeholder="https://..." oninput="applyHeroImage(this.value)">
+      </div>
+      <button class="ap-save-btn" onclick="saveDesign()">💾 Sauvegarder le design</button>
+    </div>
+
+    <!-- TAB: USERS -->
+    <div class="ap-panel" id="ap-users">
+      <p class="ap-section-title">Utilisateurs enregistrés</p>
+      <div id="users-list"></div>
+    </div>
+
+    <!-- TAB: PRICING CONTROL -->
+    <div class="ap-panel" id="ap-pricing">
+      <p class="ap-section-title">Contrôle des prix de lancement</p>
+      <div class="pricing-ctrl-row">
+        <span class="pricing-ctrl-label">Nombre de clients payants</span>
+        <input class="pricing-count-input" type="number" id="pc-count" min="0" max="100" value="0">
+      </div>
+      <div class="pricing-ctrl-row">
+        <div>
+          <div class="pricing-ctrl-label">Phase de lancement active</div>
+          <div style="font-size:.75rem;color:var(--text-muted);margin-top:2px">Désactiver pour passer aux prix normaux</div>
+        </div>
+        <label class="pricing-phase-toggle">
+          <input type="checkbox" id="pc-phase-toggle" checked>
+          <div class="ppt-track"></div>
+          <div class="ppt-thumb"></div>
+        </label>
+      </div>
+      <div class="pricing-ctrl-row">
+        <span class="pricing-ctrl-label">Places restantes calculées</span>
+        <span class="pricing-ctrl-val" id="pc-spots-display">10</span>
+      </div>
+      <div class="pricing-ctrl-row">
+        <span class="pricing-ctrl-label">Prix actuellement affichés</span>
+        <span class="pricing-ctrl-val" id="pc-price-display">€49 / €99 / €199</span>
+      </div>
+      <button class="ap-save-btn" style="margin-top:18px" onclick="savePricingControl()">💾 Appliquer les changements</button>
+      <div style="margin-top:16px;padding:12px;background:rgba(59,130,246,.06);border:1px solid rgba(59,130,246,.15);border-radius:10px">
+        <div style="font-size:.72rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--primary);margin-bottom:8px">Simulation rapide</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="ap-save-btn" style="flex:1;padding:7px;font-size:.75rem;background:rgba(255,255,255,.06);color:var(--text)" onclick="setPricingSimulation(0)">0 clients (max urgence)</button>
+          <button class="ap-save-btn" style="flex:1;padding:7px;font-size:.75rem;background:rgba(255,255,255,.06);color:var(--text)" onclick="setPricingSimulation(7)">7 clients (3 restants)</button>
+          <button class="ap-save-btn" style="flex:1;padding:7px;font-size:.75rem;background:rgba(255,255,255,.06);color:var(--text)" onclick="setPricingSimulation(10)">10 clients (phase terminée)</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ════ JAVASCRIPT ════ -->
+<script>
+// ═══════════════════════════════════════
+//  DATA DEFAULTS
+// ═══════════════════════════════════════
+const DEFAULT_TESTIMONIALS = [
+  {name:"Sophie Marchand",hotel:"Hôtel Léopold",city:"Bruxelles",stars:5,quote:"RateRadar m'a permis de réagir immédiatement quand mon principal concurrent a baissé ses prix un vendredi soir. J'ai ajusté mes tarifs en 5 minutes et j'ai rempli toutes mes chambres ce week-end."},
+  {name:"Jean-Pierre Fontaine",hotel:"Le Relais des Flandres",city:"Gand",stars:5,quote:"Avant RateRadar, je passais 2 heures chaque matin à vérifier manuellement Booking.com. Maintenant, tout est automatisé. Je récupère ce temps pour me concentrer sur mes clients."},
+  {name:"Isabelle Renard",hotel:"Boutique Hôtel du Marais",city:"Paris",stars:5,quote:"Le rapport hebdomadaire est une vraie mine d'or. J'y trouve toutes les informations pour optimiser ma stratégie tarifaire. Mon RevPAR a augmenté de 18% en 3 mois."}
+];
+
+const DEFAULT_PLANS = [
+  {
+    name:"STARTER",badge:"",price_monthly:149,price_annual:119,cta:"Commencer l'essai",cta_style:"outline",
+    features:["5 concurrents suivis","Mises à jour quotidiennes","Alertes email","Historique 30 jours","Support email"]
+  },
+  {
+    name:"PRO",badge:"Le plus populaire",price_monthly:299,price_annual:239,cta:"Commencer l'essai",cta_style:"primary",
+    features:["15 concurrents suivis","Mises à jour en temps réel","Alertes email + SMS","Historique 90 jours","Rapport hebdomadaire","Support prioritaire"]
+  },
+  {
+    name:"PREMIUM",badge:"",price_monthly:499,price_annual:399,cta:"Contacter l'équipe",cta_style:"outline",
+    features:["Concurrents illimités","Mises à jour en temps réel","Historique illimité","Appel stratégie mensuel","Intégrations personnalisées","Support dédié 24/7"]
+  }
+];
+
+const DEFAULT_FAQS = [
+  {q:"Sur quelle plateforme RateRadar surveille-t-il les prix ?",a:"RateRadar surveille actuellement Booking.com, qui représente la plus grande part de marché pour les hôtels indépendants en Europe. Expedia et Airbnb sont en cours d'intégration."},
+  {q:"Dois-je avoir des compétences techniques pour utiliser RateRadar ?",a:"Aucune compétence technique requise. Si vous savez utiliser un email, vous savez utiliser RateRadar. La configuration initiale prend moins de 5 minutes : vous entrez simplement les noms de vos concurrents."},
+  {q:"Quelle est la précision des données de prix ?",a:"Nos données sont directement extraites de Booking.com en temps réel. La précision est supérieure à 99%. En cas d'anomalie détectée, une vérification manuelle est déclenchée automatiquement."},
+  {q:"Combien de temps pour la mise en place ?",a:"La configuration initiale prend moins de 5 minutes. Vous pouvez ajouter vos concurrents, configurer vos alertes et recevoir votre premier rapport dès le lendemain matin."},
+  {q:"Puis-je suivre des hôtels dans plusieurs villes ?",a:"Oui, absolument. RateRadar fonctionne pour n'importe quelle ville dans le monde où Booking.com est actif. Vous pouvez suivre des concurrents dans plusieurs marchés simultanément."},
+  {q:"Comment fonctionne la facturation annuelle ?",a:"En choisissant la facturation annuelle, vous économisez 20% sur le tarif mensuel. Vous êtes facturé en une seule fois pour l'année. Vous pouvez annuler avant le renouvellement."},
+  {q:"Puis-je annuler à tout moment ?",a:"Oui, vous pouvez annuler votre abonnement à tout moment depuis votre tableau de bord, sans frais ni préavis. Votre accès reste actif jusqu'à la fin de la période facturée."},
+  {q:"Proposez-vous des tarifs pour les groupes hôteliers ?",a:"Oui, nous proposons des tarifs personnalisés pour les groupes de 3 hôtels ou plus. Contactez-nous via le formulaire de contact pour obtenir une offre sur mesure."}
+];
+
+// ═══════════════════════════════════════
+//  LAUNCH PHASE PRICING
+// ═══════════════════════════════════════
+const LAUNCH_MAX = 10;
+const LAUNCH_PRICES_MONTHLY = [49, 99, 199];   // starter, pro, premium
+const NORMAL_PRICES_MONTHLY = [149, 299, 499];
+
+function getClientCount()  { return parseInt(localStorage.getItem('rateradar_client_count')||'0'); }
+function getSpotsLeft()    { return Math.max(0, LAUNCH_MAX - getClientCount()); }
+function isLaunchPhase()   {
+  const ov = localStorage.getItem('rateradar_launch_phase');
+  if (ov === 'false') return false;
+  if (ov === 'true')  return true;
+  return getClientCount() < LAUNCH_MAX;
+}
+function setClientCount(n) {
+  n = Math.max(0, n);
+  localStorage.setItem('rateradar_client_count', String(n));
+  if (n >= LAUNCH_MAX) localStorage.setItem('rateradar_launch_phase', 'false');
+  refreshLaunchUI();
+}
+function incrementClientCount() { setClientCount(getClientCount() + 1); }
+
+function refreshLaunchUI() {
+  updateHeroUrgencyBanner();
+  renderPlans();
+}
+
+function updateHeroUrgencyBanner() {
+  const banner = document.getElementById('hero-urgency-banner');
+  if (!banner) return;
+  const launch = isLaunchPhase();
+  const spots  = getSpotsLeft();
+  banner.style.display = launch ? 'block' : 'none';
+  if (launch) {
+    document.getElementById('urgency-spots-count').textContent = spots;
+  }
+}
+
+// ═══════════════════════════════════════
+//  STORAGE HELPERS
+// ═══════════════════════════════════════
+const ADMIN_EMAIL = 'matisse.zamcre@gmail.com';
+
+function getUsers(){return JSON.parse(localStorage.getItem('rr_users')||'[]');}
+function saveUsers(u){localStorage.setItem('rr_users',JSON.stringify(u));}
+function getCurrentUser(){return JSON.parse(localStorage.getItem('rr_current')||'null');}
+function setCurrentUser(u){localStorage.setItem('rr_current',JSON.stringify(u));}
+function getContent(){return JSON.parse(localStorage.getItem('rr_content')||'{}');}
+function saveContentData(d){localStorage.setItem('rr_content',JSON.stringify(d));}
+function getPlansData(){return JSON.parse(localStorage.getItem('rr_plans')||JSON.stringify(DEFAULT_PLANS));}
+function savePlansData(d){localStorage.setItem('rr_plans',JSON.stringify(d));}
+function getTestimonialsData(){return JSON.parse(localStorage.getItem('rr_testi')||JSON.stringify(DEFAULT_TESTIMONIALS));}
+function saveTestimonialsData(d){localStorage.setItem('rr_testi',JSON.stringify(d));}
+function getFaqsData(){return JSON.parse(localStorage.getItem('rr_faqs')||JSON.stringify(DEFAULT_FAQS));}
+function getDesignData(){return JSON.parse(localStorage.getItem('rr_design')||'{}');}
+function saveDesignData(d){localStorage.setItem('rr_design',JSON.stringify(d));}
+
+// ═══════════════════════════════════════
+//  NAVIGATION
+// ═══════════════════════════════════════
+function showSection(name){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.getElementById('section-'+name).classList.add('active');
+  document.querySelectorAll('.nav-link').forEach(b=>{
+    b.classList.toggle('active',b.dataset.section===name);
+  });
+  window.scrollTo({top:0,behavior:'smooth'});
+  triggerReveal();
+  if(name==='pricing') renderPlans();
+  if(name==='faq') renderFaq();
+}
+
+document.querySelectorAll('.nav-link').forEach(btn=>{
+  btn.addEventListener('click',()=>showSection(btn.dataset.section));
+});
+
+// ═══════════════════════════════════════
+//  SCROLL REVEAL
+// ═══════════════════════════════════════
+function triggerReveal(){
+  setTimeout(()=>{
+    document.querySelectorAll('.reveal').forEach(el=>{
+      const rect=el.getBoundingClientRect();
+      if(rect.top<window.innerHeight-60) el.classList.add('visible');
+    });
+  },100);
+}
+window.addEventListener('scroll',triggerReveal);
+triggerReveal();
+
+// ═══════════════════════════════════════
+//  AUTH
+// ═══════════════════════════════════════
+function openModal(tab){
+  document.getElementById('auth-modal').classList.add('open');
+  switchModalTab(tab);
+}
+function closeModal(){document.getElementById('auth-modal').classList.remove('open');}
+function closeModalOverlay(e){if(e.target===document.getElementById('auth-modal')) closeModal();}
+function switchModalTab(tab){
+  document.getElementById('panel-login').classList.toggle('active',tab==='login');
+  document.getElementById('panel-register').classList.toggle('active',tab==='register');
+  document.getElementById('tab-login-btn').classList.toggle('active',tab==='login');
+  document.getElementById('tab-register-btn').classList.toggle('active',tab==='register');
+  clearMsgs();
+}
+function clearMsgs(){
+  ['login-error','register-error','register-success'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){el.classList.remove('show');el.textContent='';}
+  });
+}
+function showError(id,msg){const el=document.getElementById(id);el.textContent=msg;el.classList.add('show');}
+function showSuccess(id,msg){const el=document.getElementById(id);el.textContent=msg;el.classList.add('show');}
+
+// ═══════════════════════════════════════════════════════════════════
+//  EMAILJS CONFIG  ← remplis les 4 valeurs ci-dessous
+// ═══════════════════════════════════════════════════════════════════
+//
+//  ÉTAPES DE CONFIGURATION (5 min) :
+//  1. Va sur https://www.emailjs.com/ → crée un compte gratuit
+//  2. "Email Services" → Add New Service → connecte ta Gmail
+//     (matisse.zamcre@gmail.com) → copie le Service ID
+//  3. "Email Templates" → crée le TEMPLATE 1 (confirmation) :
+//       Subject : Confirmez votre email — RateRadar
+//       To email : {{to_email}}
+//       From name : RateRadar
+//       Body : colle le HTML du template dans le fichier TEMPLATE_CONFIRM.html
+//       Variables : {{to_name}}  {{to_email}}  {{confirm_url}}
+//  4. "Email Templates" → crée le TEMPLATE 2 (contact) :
+//       Subject : 📬 Nouveau message de {{contact_name}} — RateRadar
+//       To email : matisse.zamcre@gmail.com   (fixé dans le template)
+//       From name : RateRadar
+//       Body : colle le HTML du template dans le fichier TEMPLATE_CONTACT.html
+//       Variables : {{contact_name}}  {{contact_email}}  {{contact_hotel}}  {{contact_message}}  {{sent_at}}
+//  5. Account → API Keys → copie ta Public Key
+//
+const EMAILJS_PUBLIC_KEY        = 'YOUR_PUBLIC_KEY';         // ← ta clé publique
+const EMAILJS_SERVICE_ID        = 'YOUR_SERVICE_ID';         // ← ex: service_abc123
+const EMAILJS_TEMPLATE_CONFIRM  = 'YOUR_TEMPLATE_CONFIRM';   // ← template confirmation email
+const EMAILJS_TEMPLATE_CONTACT  = 'YOUR_TEMPLATE_CONTACT';   // ← template formulaire contact
+// ═══════════════════════════════════════════════════════════════════
+
+function initEmailJS(){
+  if(EMAILJS_PUBLIC_KEY!=='YOUR_PUBLIC_KEY'){
+    try{ emailjs.init(EMAILJS_PUBLIC_KEY); }catch(e){ console.warn('EmailJS init error:',e); }
+  }
+}
+
+function genToken(){return Math.random().toString(36).slice(2)+Date.now().toString(36);}
+
+function doRegister(){
+  const name=document.getElementById('reg-name').value.trim();
+  const email=document.getElementById('reg-email').value.trim().toLowerCase();
+  const pwd=document.getElementById('reg-pwd').value;
+  clearMsgs();
+  if(!name) return showError('register-error','Veuillez entrer votre nom.');
+  if(!email||!email.includes('@')) return showError('register-error','Email invalide.');
+  if(pwd.length<6) return showError('register-error','Mot de passe trop court (min. 6 caractères).');
+  const users=getUsers();
+  if(users.find(u=>u.email===email)) return showError('register-error','Un compte existe déjà avec cet email.');
+
+  const token=genToken();
+  const pending={name,email,pwd,date:new Date().toISOString(),isAdmin:email===ADMIN_EMAIL,token};
+  localStorage.setItem('rr_pending_'+token, JSON.stringify(pending));
+
+  const confirmUrl=window.location.href.split('?')[0]+'?confirm='+token;
+  sendConfirmationEmail(name, email, confirmUrl);
+
+  // show confirmation screen inside modal
+  document.getElementById('confirm-email-display').textContent=email;
+  document.getElementById('confirm-dev-link-text').innerHTML=
+    '<a onclick="window.location.href=\''+confirmUrl+'\'">'+confirmUrl+'</a>';
+  localStorage.setItem('rr_last_confirm_token', token);
+
+  // switch modal panel
+  document.getElementById('panel-register').classList.remove('active');
+  document.getElementById('panel-confirm').classList.add('active');
+  document.getElementById('tab-register-btn').classList.remove('active');
+}
+
+function resendConfirmation(){
+  const token=localStorage.getItem('rr_last_confirm_token');
+  if(!token) return;
+  const raw=localStorage.getItem('rr_pending_'+token);
+  if(!raw) return;
+  const p=JSON.parse(raw);
+  const confirmUrl=window.location.href.split('?')[0]+'?confirm='+token;
+  sendConfirmationEmail(p.name, p.email, confirmUrl);
+  const btn=document.querySelector('.confirm-resend');
+  if(btn){btn.textContent='Email renvoyé ✓';setTimeout(()=>btn.textContent='Renvoyer l\'email',2500);}
+}
+
+function sendConfirmationEmail(name, email, url){
+  if(EMAILJS_PUBLIC_KEY==='YOUR_PUBLIC_KEY') return;
+  try{
+    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_CONFIRM,{
+      to_name:    name,
+      to_email:   email,
+      confirm_url: url
+    }).catch(e=>console.warn('EmailJS confirm error:',e));
+  }catch(e){ console.warn('EmailJS error:',e); }
+}
+
+function checkUrlConfirmToken(){
+  const params=new URLSearchParams(window.location.search);
+  const token=params.get('confirm');
+  if(!token) return;
+  const raw=localStorage.getItem('rr_pending_'+token);
+  if(!raw){
+    // already confirmed or invalid
+    window.history.replaceState({},'',window.location.pathname);
+    return;
+  }
+  const p=JSON.parse(raw);
+  // activate the user
+  const users=getUsers();
+  if(!users.find(u=>u.email===p.email)){
+    const ea = isLaunchPhase();
+    const newUser={name:p.name,email:p.email,pwd:p.pwd,date:p.date,isAdmin:p.isAdmin,confirmed:true,
+      earlyAdopter:ea, lockedPlan:'Starter', lockedPrice:ea?LAUNCH_PRICES_MONTHLY[0]:NORMAL_PRICES_MONTHLY[0]};
+    users.push(newUser);
+    saveUsers(users);
+    incrementClientCount();
+    loginUser(newUser);
+  }
+  localStorage.removeItem('rr_pending_'+token);
+  localStorage.removeItem('rr_last_confirm_token');
+  window.history.replaceState({},'',window.location.pathname);
+  showConfirmedToast();
+}
+
+function showConfirmedToast(){
+  const t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:32px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#10B981,#059669);color:#fff;font-family:Inter,sans-serif;font-size:.9rem;font-weight:600;padding:14px 28px;border-radius:12px;box-shadow:0 10px 40px rgba(16,185,129,.4);z-index:9999;animation:fadeIn .3s ease;';
+  t.textContent='✓ Email confirmé ! Bienvenue sur RateRadar 🎉';
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),4000);
+}
+
+function doLogin(){
+  const email=document.getElementById('login-email').value.trim().toLowerCase();
+  const pwd=document.getElementById('login-pwd').value;
+  clearMsgs();
+  if(!email||!pwd) return showError('login-error','Veuillez remplir tous les champs.');
+  const users=getUsers();
+  const user=users.find(u=>u.email===email&&u.pwd===pwd);
+  if(!user){
+    // check if there's a pending confirmation for this email
+    const allKeys=Object.keys(localStorage).filter(k=>k.startsWith('rr_pending_'));
+    const pendingKey=allKeys.find(k=>{
+      try{return JSON.parse(localStorage.getItem(k)).email===email;}catch{return false;}
+    });
+    if(pendingKey){
+      const p=JSON.parse(localStorage.getItem(pendingKey));
+      if(p.pwd===pwd){
+        const token=pendingKey.replace('rr_pending_','');
+        const confirmUrl=window.location.href.split('?')[0]+'?confirm='+token;
+        document.getElementById('confirm-email-display').textContent=email;
+        document.getElementById('confirm-dev-link-text').innerHTML=
+          '<a onclick="window.location.href=\''+confirmUrl+'\'">'+confirmUrl+'</a>';
+        localStorage.setItem('rr_last_confirm_token',token);
+        document.getElementById('panel-login').classList.remove('active');
+        document.getElementById('panel-confirm').classList.add('active');
+        document.getElementById('tab-login-btn').classList.remove('active');
+        return;
+      }
+    }
+    return showError('login-error','Email ou mot de passe incorrect.');
+  }
+  loginUser(user);
+  closeModal();
+}
+
+function logout(){
+  localStorage.removeItem('rr_current');
+  updateNavAuth();
+  closeDropdown();
+}
+
+function updateNavAuth(){
+  const user=getCurrentUser();
+  const navAuth=document.getElementById('nav-auth');
+  const userMenu=document.getElementById('user-menu');
+  const adminBtn=document.getElementById('admin-btn');
+  if(user){
+    navAuth.style.display='none';
+    userMenu.style.display='flex';
+    document.getElementById('nav-av').textContent=user.name[0].toUpperCase();
+    document.getElementById('nav-username').textContent=user.name.split(' ')[0];
+    if(user.email===ADMIN_EMAIL){
+      adminBtn.classList.add('visible');
+    } else {
+      adminBtn.classList.remove('visible');
+    }
+  } else {
+    navAuth.style.display='flex';
+    userMenu.style.display='none';
+    adminBtn.classList.remove('visible');
+    document.getElementById('admin-panel').classList.remove('open');
+  }
+}
+
+function toggleDropdown(){
+  document.getElementById('user-dropdown').classList.toggle('open');
+}
+function closeDropdown(){
+  document.getElementById('user-dropdown').classList.remove('open');
+}
+document.addEventListener('click',e=>{
+  if(!document.getElementById('user-menu')?.contains(e.target)) closeDropdown();
+});
+
+// ═══════════════════════════════════════
+//  TESTIMONIALS RENDER
+// ═══════════════════════════════════════
+function renderTestimonials(){
+  const data=getTestimonialsData();
+  const grid=document.getElementById('testi-grid');
+  grid.innerHTML=data.map((t,i)=>`
+    <div class="testi-card reveal">
+      <div class="testi-stars">${'★'.repeat(t.stars)}</div>
+      <p class="testi-quote" id="testi-quote-${i}">${t.quote}</p>
+      <div class="testi-author">
+        <div class="testi-av">${t.name[0]}</div>
+        <div><div class="testi-name" id="testi-name-${i}">${t.name}</div><div class="testi-hotel" id="testi-hotel-${i}">${t.hotel} • ${t.city}</div></div>
+      </div>
+    </div>`).join('');
+  triggerReveal();
+}
+
+// ═══════════════════════════════════════
+//  PLANS RENDER
+// ═══════════════════════════════════════
+let billingAnnual=false;
+function toggleBilling(){
+  billingAnnual=!billingAnnual;
+  document.getElementById('billing-toggle').classList.toggle('on',billingAnnual);
+  document.getElementById('lbl-monthly').classList.toggle('active',!billingAnnual);
+  document.getElementById('lbl-annual').classList.toggle('active',billingAnnual);
+  renderPlans();
+}
+function renderPlans(){
+  const plans   = getPlansData();
+  const launch  = isLaunchPhase();
+  const spots   = getSpotsLeft();
+  const used    = getClientCount();
+  const pct     = Math.min(100, (used / LAUNCH_MAX) * 100);
+  const grid    = document.getElementById('plans-grid');
+
+  grid.innerHTML = plans.map((p,i) => {
+    const normalPrice  = billingAnnual ? p.price_annual  : p.price_monthly;
+    const launchMonthly = LAUNCH_PRICES_MONTHLY[i] ?? p.price_monthly;
+    const launchPrice  = billingAnnual ? Math.round(launchMonthly * 0.8) : launchMonthly;
+
+    const priceBlock = launch ? `
+      <div class="plan-price-old">€${normalPrice}<span>/mois</span></div>
+      <div class="plan-price launch">€${launchPrice}<span>/mois</span></div>
+      <div class="launch-phase-badge">🚀 Prix de lancement</div>
+      <div class="plan-period launch-guaranteed">Prix garanti à vie pour les early adopters</div>
+      <div class="launch-progress-wrap"><div class="launch-progress-fill" style="width:${pct}%"></div></div>
+      <div class="launch-spots-text">${spots}/10 places restantes</div>
+    ` : `
+      <div class="plan-price">€${normalPrice}<span>/mois</span></div>
+      <div class="plan-period">${billingAnnual?'Facturé annuellement':'Facturé mensuellement'}</div>
+    `;
+
+    return `
+    <div class="plan-card ${p.badge?'popular':''} reveal">
+      ${p.badge?`<div class="plan-badge">${p.badge}</div>`:''}
+      <div class="plan-name">${p.name}</div>
+      ${priceBlock}
+      <div class="plan-divider"></div>
+      <ul class="plan-features">${p.features.map(f=>`<li><span class="check">✓</span>${f}</li>`).join('')}</ul>
+      <button class="plan-btn ${p.cta_style==='primary'?'plan-btn-primary':'plan-btn-outline'}" onclick="planCTAClick(${i})">${p.cta}</button>
+    </div>`;
+  }).join('');
+
+  const urgency = document.getElementById('launch-urgency-text');
+  if (urgency) urgency.style.display = launch ? 'block' : 'none';
+
+  triggerReveal();
+}
+
+// ═══════════════════════════════════════
+//  FAQ RENDER
+// ═══════════════════════════════════════
+function renderFaq(){
+  const faqs=getFaqsData();
+  const list=document.getElementById('faq-list');
+  list.innerHTML=faqs.map((f,i)=>`
+    <div class="faq-item reveal" id="faq-${i}">
+      <div class="faq-q" onclick="toggleFaq(${i})">${f.q}<span class="faq-chevron">▼</span></div>
+      <div class="faq-a">${f.a}</div>
+    </div>`).join('');
+  triggerReveal();
+}
+function toggleFaq(i){
+  const item=document.getElementById('faq-'+i);
+  const wasOpen=item.classList.contains('open');
+  document.querySelectorAll('.faq-item').forEach(el=>el.classList.remove('open'));
+  if(!wasOpen) item.classList.add('open');
+}
+
+// ═══════════════════════════════════════
+//  CONTACT SUBMIT
+// ═══════════════════════════════════════
+function submitContact(e){
+  e.preventDefault();
+  const name    = document.getElementById('ct-name').value.trim();
+  const email   = document.getElementById('ct-email').value.trim();
+  const hotel   = document.getElementById('ct-hotel').value.trim();
+  const message = document.getElementById('ct-message').value.trim();
+  const errEl   = document.getElementById('ct-error');
+  const btn     = document.getElementById('ct-submit');
+  errEl.classList.remove('show');
+
+  if(!name)    return (errEl.textContent='Veuillez entrer votre nom.',     errEl.classList.add('show'));
+  if(!email||!email.includes('@')) return (errEl.textContent='Email invalide.', errEl.classList.add('show'));
+  if(!message) return (errEl.textContent='Veuillez écrire un message.',    errEl.classList.add('show'));
+
+  // EmailJS not configured → visual confirmation only
+  if(EMAILJS_PUBLIC_KEY==='YOUR_PUBLIC_KEY'){
+    btn.textContent='Message envoyé ✓';
+    btn.style.background='linear-gradient(135deg,#10B981,#059669)';
+    setTimeout(()=>{btn.textContent='Envoyer le message →';btn.style.background='';},3000);
+    return;
+  }
+
+  // Send via EmailJS
+  btn.disabled=true;
+  btn.textContent='Envoi en cours…';
+
+  const now=new Date();
+  const sentAt=now.toLocaleDateString('fr-BE',{weekday:'long',year:'numeric',month:'long',day:'numeric'})+' à '+now.toLocaleTimeString('fr-BE',{hour:'2-digit',minute:'2-digit'});
+
+  emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_CONTACT,{
+    contact_name:    name,
+    contact_email:   email,
+    contact_hotel:   hotel||'Non renseigné',
+    contact_message: message,
+    sent_at:         sentAt,
+    reply_to:        email
+  }).then(()=>{
+    btn.disabled=false;
+    btn.textContent='Message envoyé ✓';
+    btn.style.background='linear-gradient(135deg,#10B981,#059669)';
+    document.getElementById('ct-name').value='';
+    document.getElementById('ct-email').value='';
+    document.getElementById('ct-hotel').value='';
+    document.getElementById('ct-message').value='';
+    setTimeout(()=>{btn.textContent='Envoyer le message →';btn.style.background='';},4000);
+  }).catch(err=>{
+    btn.disabled=false;
+    btn.textContent='Envoyer le message →';
+    errEl.textContent='Erreur d\'envoi. Veuillez réessayer ou écrire à hello@rateradar.io';
+    errEl.classList.add('show');
+    console.warn('EmailJS contact error:',err);
+  });
+}
+
+// ═══════════════════════════════════════
+//  CONTENT LOAD & LIVE EDIT
+// ═══════════════════════════════════════
+const CONTENT_IDS=['hero-headline','hero-subheadline','proof-text','proof-rating',
+  'problem-headline','pain1-title','pain1-text','pain2-title','pain2-text',
+  'pain3-title','pain3-text','solution-headline','contact-headline','contact-sub',
+  'contact-email','contact-address','contact-hours','footer-tagline','cta-headline','cta-sub'];
+
+function loadContent(){
+  const d=getContent();
+  CONTENT_IDS.forEach(id=>{
+    if(d[id]){
+      const el=document.getElementById(id);
+      if(el) el.textContent=d[id];
+    }
+  });
+  const testi=getTestimonialsData();
+  renderTestimonials();
+}
+
+function liveEdit(id,val){
+  const el=document.getElementById(id);
+  if(el) el.textContent=val;
+}
+function liveEditHTML(id,val){
+  const el=document.getElementById(id);
+  if(el) el.innerHTML=val;
+}
+
+function saveContent(){
+  const d=getContent();
+  CONTENT_IDS.forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) d[id]=el.textContent;
+  });
+  saveContentData(d);
+  // save testimonials
+  const testi=getTestimonialsData();
+  testi.forEach((t,i)=>{
+    const qEl=document.getElementById(`ae-testi-quote-${i}`);
+    const nEl=document.getElementById(`ae-testi-name-${i}`);
+    const hEl=document.getElementById(`ae-testi-hotel-${i}`);
+    const cEl=document.getElementById(`ae-testi-city-${i}`);
+    if(qEl) t.quote=qEl.value;
+    if(nEl) t.name=nEl.value;
+    if(hEl) t.hotel=hEl.value;
+    if(cEl) t.city=cEl.value;
+  });
+  saveTestimonialsData(testi);
+  renderTestimonials();
+  flashSave();
+}
+
+function flashSave(){
+  const btn=document.querySelector('#ap-contenu .ap-save-btn');
+  if(!btn) return;
+  btn.textContent='✓ Sauvegardé !';
+  setTimeout(()=>btn.textContent='💾 Sauvegarder le contenu',1500);
+}
+
+// ═══════════════════════════════════════
+//  ADMIN PANEL
+// ═══════════════════════════════════════
+let adminOpen=false;
+function toggleAdmin(){
+  adminOpen=!adminOpen;
+  document.getElementById('admin-panel').classList.toggle('open',adminOpen);
+  if(adminOpen){
+    populateAdminFields();
+    renderUsersTab();
+  }
+}
+
+function switchApTab(tab){
+  document.querySelectorAll('.ap-tab').forEach((t,i)=>{
+    const tabs=['contenu','tarifs','design','users','pricing'];
+    t.classList.toggle('active',tabs[i]===tab);
+  });
+  document.querySelectorAll('.ap-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('ap-'+tab).classList.add('active');
+  if(tab==='users')   renderUsersTab();
+  if(tab==='pricing') refreshPricingControlPanel();
+}
+
+function refreshPricingControlPanel(){
+  const count = getClientCount();
+  const phase = isLaunchPhase();
+  const el = document.getElementById('pc-count');
+  if(el) el.value = count;
+  const tog = document.getElementById('pc-phase-toggle');
+  if(tog) tog.checked = phase;
+  syncPricingControlDisplay();
+}
+
+function syncPricingControlDisplay(){
+  const count = parseInt(document.getElementById('pc-count')?.value||'0');
+  const phase = document.getElementById('pc-phase-toggle')?.checked ?? true;
+  const spots = Math.max(0, LAUNCH_MAX - count);
+  const el = document.getElementById('pc-spots-display');
+  if(el) el.textContent = spots + ' place' + (spots!==1?'s':'') + ' restante' + (spots!==1?'s':'');
+  const pd = document.getElementById('pc-price-display');
+  if(pd) pd.textContent = phase
+    ? '€'+LAUNCH_PRICES_MONTHLY.join(' / €')
+    : '€'+NORMAL_PRICES_MONTHLY.join(' / €');
+}
+
+function savePricingControl(){
+  const count = Math.max(0, parseInt(document.getElementById('pc-count')?.value||'0'));
+  const phase = document.getElementById('pc-phase-toggle')?.checked ?? true;
+  localStorage.setItem('rateradar_client_count', String(count));
+  localStorage.setItem('rateradar_launch_phase', String(phase));
+  if(count >= LAUNCH_MAX) localStorage.setItem('rateradar_launch_phase','false');
+  syncPricingControlDisplay();
+  refreshLaunchUI();
+  // visual feedback
+  const btn = document.querySelector('#ap-pricing .ap-save-btn');
+  if(btn){ btn.textContent='✓ Appliqué !'; setTimeout(()=>btn.textContent='💾 Appliquer les changements',2000); }
+}
+
+function setPricingSimulation(n){
+  const countEl = document.getElementById('pc-count');
+  const togEl   = document.getElementById('pc-phase-toggle');
+  if(countEl) countEl.value = n;
+  if(togEl)   togEl.checked = n < LAUNCH_MAX;
+  syncPricingControlDisplay();
+}
+
+// live sync display when inputs change
+document.addEventListener('change', e => {
+  if(e.target.id==='pc-count'||e.target.id==='pc-phase-toggle') syncPricingControlDisplay();
+});
+
+function populateAdminFields(){
+  // content fields
+  CONTENT_IDS.forEach(id=>{
+    const pageEl=document.getElementById(id);
+    const adminEl=document.getElementById('ae-'+id);
+    if(pageEl&&adminEl) adminEl.value=pageEl.textContent||pageEl.innerHTML;
+  });
+  // testimonials
+  const testi=getTestimonialsData();
+  const container=document.getElementById('ae-testimonials');
+  container.innerHTML=testi.map((t,i)=>`
+    <div class="testi-edit-block">
+      <p class="ap-section-title">Témoignage ${i+1}</p>
+      <div class="ap-field"><label class="ap-label">Nom</label><input class="ap-input" id="ae-testi-name-${i}" value="${t.name}" oninput="liveEdit('testi-name-${i}',this.value)"></div>
+      <div class="ap-field"><label class="ap-label">Hôtel</label><input class="ap-input" id="ae-testi-hotel-${i}" value="${t.hotel}" oninput="updateTestiHotel(${i})"></div>
+      <div class="ap-field"><label class="ap-label">Ville</label><input class="ap-input" id="ae-testi-city-${i}" value="${t.city}" oninput="updateTestiHotel(${i})"></div>
+      <div class="ap-field"><label class="ap-label">Citation</label><textarea class="ap-input" id="ae-testi-quote-${i}" oninput="liveEdit('testi-quote-${i}',this.value)">${t.quote}</textarea></div>
+    </div>`).join('');
+
+  // plans
+  const plans=getPlansData();
+  const plansContainer=document.getElementById('ae-plans');
+  plansContainer.innerHTML=plans.map((p,i)=>`
+    <div class="plan-section">
+      <p class="ap-section-title">${p.name}</p>
+      <div class="ap-field"><label class="ap-label">Nom du plan</label><input class="ap-input" id="ae-plan-name-${i}" value="${p.name}"></div>
+      <div class="ap-field"><label class="ap-label">Badge (laisser vide si aucun)</label><input class="ap-input" id="ae-plan-badge-${i}" value="${p.badge||''}"></div>
+      <div class="ap-field"><label class="ap-label">Prix mensuel (€)</label><input type="number" class="ap-input" id="ae-plan-pm-${i}" value="${p.price_monthly}"></div>
+      <div class="ap-field"><label class="ap-label">Prix annuel (€)</label><input type="number" class="ap-input" id="ae-plan-pa-${i}" value="${p.price_annual}"></div>
+      <div class="ap-field"><label class="ap-label">Texte CTA</label><input class="ap-input" id="ae-plan-cta-${i}" value="${p.cta}"></div>
+      <div class="ap-field"><label class="ap-label">Style CTA (primary / outline)</label><input class="ap-input" id="ae-plan-ctas-${i}" value="${p.cta_style}"></div>
+      <div class="ap-field">
+        <label class="ap-label">Fonctionnalités</label>
+        <div class="feature-list-editor" id="feat-editor-${i}">
+          ${p.features.map((f,j)=>`<div class="feat-edit-row"><input value="${f}" id="ae-feat-${i}-${j}"><button class="feat-del" onclick="removeFeat(${i},${j})">✕</button></div>`).join('')}
+        </div>
+        <button class="feat-add" onclick="addFeat(${i})">+ Ajouter une fonctionnalité</button>
+      </div>
+    </div>`).join('');
+
+  // design
+  const des=getDesignData();
+  if(des.primary){document.getElementById('dc-primary').value=des.primary;document.getElementById('dc-primary-hex').value=des.primary;}
+  if(des.secondary){document.getElementById('dc-secondary').value=des.secondary;document.getElementById('dc-secondary-hex').value=des.secondary;}
+  if(des.bg){document.getElementById('dc-bg').value=des.bg;document.getElementById('dc-bg-hex').value=des.bg;}
+  if(des.bg2){document.getElementById('dc-bg2').value=des.bg2;document.getElementById('dc-bg2-hex').value=des.bg2;}
+  if(des.heroStyle){document.getElementById('dc-hero-style').value=des.heroStyle;applyHeroStyle(des.heroStyle);}
+  if(des.heroImg){document.getElementById('dc-hero-img').value=des.heroImg;}
+}
+
+function updateTestiHotel(i){
+  const hotel=document.getElementById(`ae-testi-hotel-${i}`)?.value||'';
+  const city=document.getElementById(`ae-testi-city-${i}`)?.value||'';
+  const el=document.getElementById(`testi-hotel-${i}`);
+  if(el) el.textContent=`${hotel} • ${city}`;
+}
+
+function addFeat(planIdx){
+  const plans=getPlansData();
+  plans[planIdx].features.push('Nouvelle fonctionnalité');
+  savePlansData(plans);
+  populateAdminFields();
+  renderPlans();
+}
+function removeFeat(planIdx,featIdx){
+  const plans=getPlansData();
+  plans[planIdx].features.splice(featIdx,1);
+  savePlansData(plans);
+  populateAdminFields();
+  renderPlans();
+}
+
+function savePlans(){
+  const plans=getPlansData();
+  plans.forEach((p,i)=>{
+    const n=document.getElementById(`ae-plan-name-${i}`);
+    const b=document.getElementById(`ae-plan-badge-${i}`);
+    const pm=document.getElementById(`ae-plan-pm-${i}`);
+    const pa=document.getElementById(`ae-plan-pa-${i}`);
+    const cta=document.getElementById(`ae-plan-cta-${i}`);
+    const ctas=document.getElementById(`ae-plan-ctas-${i}`);
+    if(n) p.name=n.value;
+    if(b) p.badge=b.value;
+    if(pm) p.price_monthly=parseInt(pm.value)||p.price_monthly;
+    if(pa) p.price_annual=parseInt(pa.value)||p.price_annual;
+    if(cta) p.cta=cta.value;
+    if(ctas) p.cta_style=ctas.value;
+    // collect features
+    const feats=[];
+    const editor=document.getElementById(`feat-editor-${i}`);
+    if(editor){
+      editor.querySelectorAll('input').forEach(inp=>feats.push(inp.value));
+      p.features=feats;
+    }
+  });
+  savePlansData(plans);
+  renderPlans();
+  const btn=document.querySelector('#ap-tarifs .ap-save-btn');
+  if(btn){btn.textContent='✓ Sauvegardé !';setTimeout(()=>btn.textContent='💾 Sauvegarder les tarifs',1500);}
+}
+
+// ═══════════════════════════════════════
+//  DESIGN
+// ═══════════════════════════════════════
+function applyColor(varName,val){
+  document.documentElement.style.setProperty('--'+varName,val);
+}
+function applyHeroStyle(val){
+  const hero=document.getElementById('hero');
+  const imgField=document.getElementById('hero-img-field');
+  imgField.style.display=val==='image'?'block':'none';
+  if(val==='dark'){hero.style.background='';}
+  else if(val==='gradient'){hero.style.background='linear-gradient(135deg,rgba(59,130,246,.15),rgba(139,92,246,.15))';}
+  else if(val==='image'){
+    const img=document.getElementById('dc-hero-img')?.value;
+    if(img) applyHeroImage(img);
+  }
+}
+function applyHeroImage(url){
+  if(url) document.getElementById('hero').style.background=`url('${url}') center/cover no-repeat`;
+}
+function saveDesign(){
+  const des={
+    primary:document.getElementById('dc-primary').value,
+    secondary:document.getElementById('dc-secondary').value,
+    bg:document.getElementById('dc-bg').value,
+    bg2:document.getElementById('dc-bg2').value,
+    heroStyle:document.getElementById('dc-hero-style').value,
+    heroImg:document.getElementById('dc-hero-img')?.value||''
+  };
+  saveDesignData(des);
+  const btn=document.querySelector('#ap-design .ap-save-btn');
+  if(btn){btn.textContent='✓ Sauvegardé !';setTimeout(()=>btn.textContent='💾 Sauvegarder le design',1500);}
+}
+function loadDesign(){
+  const des=getDesignData();
+  if(des.primary) applyColor('primary',des.primary);
+  if(des.secondary) applyColor('secondary',des.secondary);
+  if(des.bg) applyColor('bg',des.bg);
+  if(des.bg2) applyColor('bg2',des.bg2);
+  if(des.heroStyle) applyHeroStyle(des.heroStyle);
+  if(des.heroImg&&des.heroStyle==='image') applyHeroImage(des.heroImg);
+}
+
+// ═══════════════════════════════════════
+//  USERS TAB
+// ═══════════════════════════════════════
+function renderUsersTab(){
+  const users=getUsers();
+  const list=document.getElementById('users-list');
+  if(!users.length){list.innerHTML='<p style="color:var(--text-muted);font-size:.85rem;">Aucun utilisateur enregistré.</p>';return;}
+  list.innerHTML=`<div class="user-list">${users.map((u,i)=>`
+    <div class="user-row" id="ur-${i}">
+      <div class="user-row-info">
+        <div class="user-row-name">${u.name} ${u.email===ADMIN_EMAIL?'<span style="font-size:.7rem;color:var(--primary);background:rgba(59,130,246,.1);padding:1px 7px;border-radius:4px;margin-left:4px;">Admin</span>':''}</div>
+        <div class="user-row-email">${u.email}</div>
+        <div class="user-row-date">${new Date(u.date).toLocaleDateString('fr-BE',{day:'2-digit',month:'long',year:'numeric'})}</div>
+      </div>
+      ${u.email!==ADMIN_EMAIL?`<button class="user-del-btn" onclick="deleteUser(${i})">Supprimer</button>`:'<span style="font-size:.75rem;color:var(--text-muted);">Protégé</span>'}
+    </div>`).join('')}</div>`;
+}
+function deleteUser(i){
+  const users=getUsers();
+  const cur=getCurrentUser();
+  if(users[i]&&cur&&users[i].email===cur.email){
+    alert('Vous ne pouvez pas supprimer votre propre compte.');return;
+  }
+  users.splice(i,1);
+  saveUsers(users);
+  renderUsersTab();
+}
+
+// ═══════════════════════════════════════
+//  PAYMENT MODAL
+// ═══════════════════════════════════════
+let _payPlanIndex=0;
+
+function planCTAClick(planIdx){
+  const user=getCurrentUser();
+  if(!user){
+    // not logged in → open auth modal first, remember plan
+    localStorage.setItem('rr_pending_plan',planIdx);
+    openModal('register');
+    return;
+  }
+  _payPlanIndex=planIdx;
+  openPayModal(planIdx);
+}
+
+function openPayModal(planIdx){
+  const plans=getPlansData();
+  const p=plans[planIdx];
+  const price=billingAnnual?p.price_annual:p.price_monthly;
+  const period=billingAnnual?'Annuelle (–20%)':'Mensuelle';
+
+  document.getElementById('pay-plan-name').textContent=p.name;
+  const badgeWrap=document.getElementById('pay-plan-badge-wrap');
+  const badgeEl=document.getElementById('pay-plan-badge');
+  if(p.badge){badgeEl.textContent=p.badge;badgeWrap.style.display='block';}
+  else{badgeWrap.style.display='none';}
+  document.getElementById('pay-price-display').textContent='€'+price+'/mois';
+  document.getElementById('pay-billing-period').textContent=period;
+
+  // pre-fill email from logged in user
+  const user=getCurrentUser();
+  if(user) document.getElementById('pay-email').value=user.email;
+  if(user) document.getElementById('pay-name').value=user.name;
+
+  // reset state
+  document.getElementById('pay-form-wrap').style.display='';
+  document.getElementById('pay-success').classList.remove('show');
+  document.getElementById('pay-error').classList.remove('show');
+  document.getElementById('pay-submit-btn').disabled=false;
+  document.getElementById('pay-btn-text').textContent='Démarrer l\'essai gratuit 🔒';
+
+  document.getElementById('payment-modal').classList.add('open');
+}
+
+function closePayModal(){
+  document.getElementById('payment-modal').classList.remove('open');
+  // if plan was saved because user wasn't logged in, try again now
+  const pending=localStorage.getItem('rr_pending_plan');
+  if(pending!==null && getCurrentUser()){
+    localStorage.removeItem('rr_pending_plan');
+    setTimeout(()=>openPayModal(parseInt(pending)),300);
+  }
+}
+function closePayModalOverlay(e){
+  if(e.target===document.getElementById('payment-modal')) closePayModal();
+}
+
+// loginUser — handles post-auth plan redirect
+function loginUser(user){
+  setCurrentUser(user);
+  updateNavAuth();
+  const pending=localStorage.getItem('rr_pending_plan');
+  if(pending!==null){
+    localStorage.removeItem('rr_pending_plan');
+    closeModal();
+    setTimeout(()=>openPayModal(parseInt(pending)),400);
+  }
+}
+
+// Card number formatter
+function formatCard(inp){
+  let v=inp.value.replace(/\D/g,'').slice(0,16);
+  inp.value=v.replace(/(.{4})/g,'$1 ').trim();
+  const brand=document.getElementById('card-brand');
+  if(v.startsWith('4')) brand.textContent='VISA';
+  else if(/^5[1-5]/.test(v)||/^2[2-7]/.test(v)) brand.textContent='MC';
+  else if(/^3[47]/.test(v)) brand.textContent='AMEX';
+  else brand.textContent='';
+}
+function formatExpiry(inp){
+  let v=inp.value.replace(/\D/g,'').slice(0,4);
+  if(v.length>=3) v=v.slice(0,2)+' / '+v.slice(2);
+  inp.value=v;
+}
+
+function processPayment(){
+  const name=document.getElementById('pay-name').value.trim();
+  const card=document.getElementById('pay-card').value.replace(/\s/g,'');
+  const expiry=document.getElementById('pay-expiry').value.replace(/\s/g,'');
+  const cvv=document.getElementById('pay-cvv').value.trim();
+  const email=document.getElementById('pay-email').value.trim();
+  const errEl=document.getElementById('pay-error');
+  errEl.classList.remove('show');
+
+  if(!name) return showPayError('Veuillez entrer le nom du titulaire.');
+  if(card.length<15||card.length>16||!/^\d+$/.test(card)) return showPayError('Numéro de carte invalide.');
+  if(expiry.length<4) return showPayError('Date d\'expiration invalide (ex: 12/27).');
+  if(cvv.length<3) return showPayError('Code CVV invalide.');
+  if(!email||!email.includes('@')) return showPayError('Email de facturation invalide.');
+
+  // simulate payment processing
+  const btn=document.getElementById('pay-submit-btn');
+  btn.disabled=true;
+  document.getElementById('pay-btn-text').innerHTML='<span class="spinner"></span> Traitement en cours…';
+
+  setTimeout(()=>{
+    document.getElementById('pay-form-wrap').style.display='none';
+    document.getElementById('pay-success').classList.add('show');
+  },1800);
+}
+function showPayError(msg){
+  const el=document.getElementById('pay-error');
+  el.textContent='⚠ '+msg;
+  el.classList.add('show');
+  const btn=document.getElementById('pay-submit-btn');
+  btn.disabled=false;
+  document.getElementById('pay-btn-text').textContent='Démarrer l\'essai gratuit 🔒';
+}
+
+// ═══════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════
+function init(){
+  initEmailJS();
+  loadContent();
+  loadDesign();
+  renderPlans();
+  renderFaq();
+  renderTestimonials();
+  updateNavAuth();
+  checkUrlConfirmToken();
+  updateHeroUrgencyBanner();
+  triggerReveal();
+}
+init();
+</script>
+</body>
+</html>
