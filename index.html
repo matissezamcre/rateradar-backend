@@ -973,8 +973,34 @@ textarea.ap-input{resize:vertical;min-height:80px;}
       <p class="modal-subtitle">Connectez-vous à votre compte RateRadar</p>
       <div class="msg-error" id="login-error"></div>
       <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="login-email" placeholder="vous@hotel.com"></div>
-      <div class="form-group"><label class="form-label">Mot de passe</label><input type="password" class="form-input" id="login-pwd" placeholder="••••••••"></div>
+      <div class="form-group"><label class="form-label">Mot de passe</label><input type="password" class="form-input" id="login-pwd" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
       <button class="form-submit" onclick="doLogin()">Se connecter →</button>
+      <div style="text-align:center;margin-top:14px">
+        <button type="button" onclick="showForgotPanel()" style="background:none;border:none;color:var(--text-muted);font-size:.8rem;cursor:pointer;font-family:'Inter',sans-serif;text-decoration:underline;text-underline-offset:3px;opacity:.7;transition:opacity .15s" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.7'">Mot de passe oublié ?</button>
+      </div>
+    </div>
+
+    <!-- RESET PASSWORD — step 1: enter email -->
+    <div class="modal-form-panel" id="panel-reset">
+      <h2 class="modal-title">Réinitialiser 🔑</h2>
+      <p class="modal-subtitle">Entrez votre email, on vous envoie un lien.</p>
+      <div class="msg-error" id="reset-error"></div>
+      <div class="msg-success" id="reset-success"></div>
+      <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="reset-email" placeholder="vous@hotel.com" onkeydown="if(event.key==='Enter')sendPasswordReset()"></div>
+      <button class="form-submit" onclick="sendPasswordReset()">Envoyer le lien →</button>
+      <div style="text-align:center;margin-top:14px">
+        <button type="button" onclick="switchModalTab('login')" style="background:none;border:none;color:var(--text-muted);font-size:.8rem;cursor:pointer;font-family:'Inter',sans-serif;opacity:.7;transition:opacity .15s" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.7'">← Retour à la connexion</button>
+      </div>
+    </div>
+
+    <!-- RESET PASSWORD — step 2: enter new password -->
+    <div class="modal-form-panel" id="panel-new-pwd">
+      <h2 class="modal-title">Nouveau mot de passe 🔒</h2>
+      <p class="modal-subtitle">Choisissez un nouveau mot de passe pour votre compte.</p>
+      <div class="msg-error" id="newpwd-error"></div>
+      <div class="form-group"><label class="form-label">Nouveau mot de passe</label><input type="password" class="form-input" id="new-pwd-input" placeholder="Min. 6 caractères" onkeydown="if(event.key==='Enter')submitNewPassword()"></div>
+      <div class="form-group"><label class="form-label">Confirmer</label><input type="password" class="form-input" id="new-pwd-confirm" placeholder="••••••••" onkeydown="if(event.key==='Enter')submitNewPassword()"></div>
+      <button class="form-submit" onclick="submitNewPassword()">Enregistrer →</button>
     </div>
     <!-- REGISTER -->
     <div class="modal-form-panel" id="panel-register">
@@ -1288,9 +1314,22 @@ function closeModalOverlay(e){if(e.target===document.getElementById('auth-modal'
 function switchModalTab(tab){
   document.getElementById('panel-login').classList.toggle('active',tab==='login');
   document.getElementById('panel-register').classList.toggle('active',tab==='register');
+  document.getElementById('panel-reset').classList.remove('active');
+  document.getElementById('panel-new-pwd').classList.remove('active');
   document.getElementById('tab-login-btn').classList.toggle('active',tab==='login');
   document.getElementById('tab-register-btn').classList.toggle('active',tab==='register');
   clearMsgs();
+}
+function showForgotPanel(){
+  document.getElementById('panel-login').classList.remove('active');
+  document.getElementById('panel-register').classList.remove('active');
+  document.getElementById('panel-reset').classList.add('active');
+  document.getElementById('panel-new-pwd').classList.remove('active');
+  document.getElementById('tab-login-btn').classList.remove('active');
+  document.getElementById('tab-register-btn').classList.remove('active');
+  clearMsgs();
+  const loginEmail = document.getElementById('login-email').value.trim();
+  if(loginEmail) document.getElementById('reset-email').value = loginEmail;
 }
 function clearMsgs(){
   ['login-error','register-error','register-success'].forEach(id=>{
@@ -1300,6 +1339,105 @@ function clearMsgs(){
 }
 function showError(id,msg){const el=document.getElementById(id);el.textContent=msg;el.classList.add('show');}
 function showSuccess(id,msg){const el=document.getElementById(id);el.textContent=msg;el.classList.add('show');}
+
+// ─── PASSWORD RESET ───────────────────────────────────────────────────────────
+
+const RR_RESEND_KEY = 'Bearer re_6rsJYY97_HWwAMHu2rQR3UcU9AitNzuk9';
+
+async function rrSendEmail(to, subject, html) {
+  try {
+    const r = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Authorization': RR_RESEND_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: 'RateRadar <onboarding@resend.dev>', to: [to], subject, html })
+    });
+    return await r.json();
+  } catch(e) { console.error('[reset email]', e); return null; }
+}
+
+async function sendPasswordReset() {
+  const email = (document.getElementById('reset-email').value || '').trim().toLowerCase();
+  if (!email) return showError('reset-error', 'Entrez votre adresse email.');
+  const users = getUsers();
+  const user = users.find(u => u.email === email);
+  if (!user) {
+    showSuccess('reset-success', '📬 Si ce compte existe, vous recevrez un email dans quelques secondes.');
+    return;
+  }
+  const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  const expiry = Date.now() + 30 * 60 * 1000;
+  localStorage.setItem('rr_reset_' + token, JSON.stringify({ email, expiry }));
+  const resetUrl = window.location.href.split('?')[0] + '?reset=' + token;
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#050A18;font-family:Inter,Helvetica,sans-serif;color:#e2e8f0">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#050A18;padding:40px 0">
+<tr><td align="center">
+<table width="580" cellpadding="0" cellspacing="0" style="background:#0F1C35;border-radius:16px;border:1px solid #1a2d4a;overflow:hidden;max-width:580px;width:100%">
+  <tr><td style="padding:28px 36px 20px;border-bottom:1px solid #1a2d4a">
+    <span style="font-size:22px;font-weight:800;color:#60A5FA">📡 RateRadar</span>
+  </td></tr>
+  <tr><td style="padding:32px 36px">
+    <h1 style="margin:0 0 8px;font-size:22px;font-weight:800;color:#f8fafc">R&eacute;initialisation du mot de passe 🔑</h1>
+    <p style="margin:0 0 24px;font-size:14px;color:#94a3b8">Vous avez demand&eacute; &agrave; r&eacute;initialiser le mot de passe de votre compte <strong style="color:#e2e8f0">${email}</strong>.</p>
+    <p style="margin:0 0 20px;font-size:14px;color:#cbd5e1">Cliquez sur le bouton ci-dessous pour choisir un nouveau mot de passe. Ce lien est valable <strong>30 minutes</strong>.</p>
+    <a href="${resetUrl}" style="display:inline-block;background:#3B82F6;color:#fff;text-decoration:none;font-weight:600;font-size:14px;padding:13px 28px;border-radius:10px;margin-bottom:24px">R&eacute;initialiser mon mot de passe &rarr;</a>
+    <p style="margin:0;font-size:12px;color:#64748b">Si vous n&apos;avez pas demand&eacute; cette r&eacute;initialisation, ignorez cet email &mdash; votre mot de passe reste inchang&eacute;.</p>
+  </td></tr>
+  <tr><td style="padding:16px 36px 24px;border-top:1px solid #1a2d4a;text-align:center">
+    <p style="margin:0;font-size:11px;color:#64748b">&copy; 2026 RateRadar &middot; Intelligence tarifaire h&ocirc;teli&egrave;re</p>
+  </td></tr>
+</table></td></tr></table></body></html>`;
+  await rrSendEmail(email, '🔑 Réinitialisation de votre mot de passe RateRadar', html);
+  showSuccess('reset-success', '📬 Email envoyé ! Vérifiez votre boîte mail (et vos spams).');
+  document.getElementById('reset-email').value = '';
+}
+
+function checkUrlResetToken() {
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('reset');
+  if (!token) return;
+  const raw = localStorage.getItem('rr_reset_' + token);
+  if (!raw) { window.history.replaceState({}, '', window.location.pathname); return; }
+  const { email, expiry } = JSON.parse(raw);
+  if (Date.now() > expiry) {
+    localStorage.removeItem('rr_reset_' + token);
+    window.history.replaceState({}, '', window.location.pathname);
+    return;
+  }
+  window._resetToken = token;
+  window._resetEmail = email;
+  window.history.replaceState({}, '', window.location.pathname);
+  ['panel-login','panel-register','panel-reset'].forEach(id => document.getElementById(id).classList.remove('active'));
+  document.getElementById('panel-new-pwd').classList.add('active');
+  document.getElementById('tab-login-btn').classList.remove('active');
+  document.getElementById('tab-register-btn').classList.remove('active');
+  document.getElementById('auth-modal').classList.add('open');
+}
+
+function submitNewPassword() {
+  const pwd = document.getElementById('new-pwd-input').value;
+  const confirm = document.getElementById('new-pwd-confirm').value;
+  if (!pwd || pwd.length < 6) return showError('newpwd-error', 'Minimum 6 caractères.');
+  if (pwd !== confirm) return showError('newpwd-error', 'Les mots de passe ne correspondent pas.');
+  const token = window._resetToken;
+  const email = window._resetEmail;
+  if (!token || !email) return showError('newpwd-error', 'Lien invalide ou expiré.');
+  const users = getUsers();
+  const idx = users.findIndex(u => u.email === email);
+  if (idx === -1) return showError('newpwd-error', 'Compte introuvable.');
+  users[idx].pwd = pwd;
+  saveUsers(users);
+  localStorage.removeItem('rr_reset_' + token);
+  window._resetToken = null;
+  window._resetEmail = null;
+  loginUser(users[idx]);
+  closeModal();
+  const t = document.createElement('div');
+  t.style.cssText = 'position:fixed;bottom:32px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#3B82F6,#8B5CF6);color:#fff;font-family:Inter,sans-serif;font-size:.9rem;font-weight:600;padding:14px 28px;border-radius:12px;box-shadow:0 10px 40px rgba(59,130,246,.4);z-index:9999';
+  t.textContent = '✓ Mot de passe mis à jour — vous êtes connecté !';
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 4000);
+}
 
 // ═══════════════════════════════════════════════════════════════════
 //  EMAILJS CONFIG  ← remplis les 4 valeurs ci-dessous
@@ -2084,6 +2222,7 @@ function init(){
   renderTestimonials();
   updateNavAuth();
   checkUrlConfirmToken();
+  checkUrlResetToken();
   updateHeroUrgencyBanner();
   triggerReveal();
 }
