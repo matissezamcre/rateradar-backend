@@ -3002,7 +3002,9 @@ function tryLogin() {
   if (!email) { toast('Erreur','Entrez votre adresse email','#EF4444'); return; }
   if (!pass)  { toast('Erreur','Entrez votre mot de passe','#EF4444'); return; }
 
-  localStorage.setItem('rateradar_session', email);
+  localStorage.setItem('rateradar_session', email); // legacy
+  const _tok = 'rr_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+  localStorage.setItem('rateradar_session_token', JSON.stringify({ token: _tok, email, expires: Date.now() + 30*24*60*60*1000 }));
   SESSION_EMAIL = email;
   const today = new Date().toISOString().slice(0,10);
   let user = getStoredUser(email);
@@ -3547,19 +3549,22 @@ function saveCustomizePanel() {
 }
 
 function logout() {
-  localStorage.removeItem('rateradar_session');
+  localStorage.removeItem('rateradar_session_token');
+  localStorage.removeItem('rateradar_session'); // legacy
+  localStorage.removeItem('rr_current');         // marketing-site key
   SESSION_EMAIL = null; SESSION_USER = null; ADMIN_VIEWING = null;
-  // Reset theme to defaults
   applyPreferences(DEFAULT_PREFS);
   document.body.style.fontSize = '';
-  // Remove admin badge if present
   document.querySelector('.admin-badge')?.remove();
   document.querySelector('.admin-dd-item')?.remove();
   document.querySelector('.admin-dd-item + .nav-dd-sep')?.remove();
   document.getElementById('admin-banner')?.classList.remove('active');
-  document.getElementById('login-overlay').classList.remove('hidden');
-  document.getElementById('login-email').value = '';
-  document.getElementById('login-pass').value = '';
+  // Show brief farewell then redirect to marketing site
+  const bye = document.createElement('div');
+  bye.style.cssText = 'position:fixed;inset:0;background:#020B18;display:flex;align-items:center;justify-content:center;z-index:9999;font-family:Inter,sans-serif';
+  bye.innerHTML = '<div style="text-align:center"><div style="font-size:36px;margin-bottom:12px">👋</div><div style="font-size:15px;color:#64748b">Déconnexion…</div></div>';
+  document.body.appendChild(bye);
+  setTimeout(() => { window.location.href = 'index.html'; }, 700);
 }
 
 // ============================================================
@@ -3610,9 +3615,10 @@ async function confirmDeleteAccount() {
   }
 
   // 2. Wipe all localStorage data for this user
-  localStorage.removeItem(RR_KEY(email));          // rateradar_user_{email}
-  localStorage.removeItem('rr_backend_' + email);  // backend IDs
+  localStorage.removeItem(RR_KEY(email));
+  localStorage.removeItem('rr_backend_' + email);
   localStorage.removeItem('rateradar_session');
+  localStorage.removeItem('rateradar_session_token');
   // Remove from rateradar_users index
   const all = getAllStoredUsers().filter(u => u.email !== email);
   localStorage.setItem('rateradar_users', JSON.stringify(all));
@@ -3632,32 +3638,79 @@ async function confirmDeleteAccount() {
   t.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:99999;font-family:Inter,sans-serif';
   t.innerHTML = '<div style="text-align:center;color:#fff"><div style="font-size:48px;margin-bottom:16px">👋</div><div style="font-size:22px;font-weight:700;margin-bottom:8px">Compte supprimé</div><div style="font-size:15px;color:#94a3b8">Redirection dans 3 secondes…</div></div>';
   document.body.appendChild(t);
-  setTimeout(() => { window.location.href = '/'; }, 3000);
+  setTimeout(() => { window.location.href = 'index.html'; }, 3000);
+}
+
+// ============================================================
+// SESSION TOKEN HELPERS
+// ============================================================
+function getSessionToken() {
+  try {
+    const raw = localStorage.getItem('rateradar_session_token');
+    if (!raw) return null;
+    const d = JSON.parse(raw);
+    if (!d.token || !d.email || !d.expires) return null;
+    if (Date.now() > d.expires) { localStorage.removeItem('rateradar_session_token'); return null; }
+    return d;
+  } catch(e) { return null; }
+}
+
+function redirectToLogin() {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:#020B18;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;font-family:Inter,sans-serif;opacity:0;transition:opacity .3s ease';
+  overlay.innerHTML = '<div style="text-align:center"><div style="font-size:40px;margin-bottom:14px">📡</div><div style="font-size:20px;font-weight:800;color:#f1f5f9;margin-bottom:8px">RateRadar</div><div style="font-size:14px;color:#64748b">Redirection vers la connexion…</div></div>';
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => { overlay.style.opacity = '1'; });
+  setTimeout(() => { window.location.href = 'index.html#login'; }, 800);
 }
 
 // ============================================================
 // STARTUP CHECK
 // ============================================================
 function startupCheck() {
-  const session = localStorage.getItem('rateradar_session');
-  if (!session) {
-    document.getElementById('login-overlay').classList.remove('hidden');
-    return;
+  const today = new Date().toISOString().slice(0,10);
+
+  // ── 1. New unified session token (written by index.html on login) ──
+  const td = getSessionToken();
+  if (td) {
+    const user = getStoredUser(td.email);
+    if (user) {
+      SESSION_EMAIL = td.email;
+      user.lastLogin = today;
+      saveStoredUser(user);
+      SESSION_USER = user;
+      if (!user.backendClientId) {
+        const ids = getBackendIds(user.email);
+        if (ids?.clientId) { user.backendClientId = ids.clientId; user.backendAirtableId = ids.airtableId; saveStoredUser(user); }
+      }
+      if (!user.onboardingComplete) { startOnboarding(); } else { applyUserData(user); }
+      return;
+    }
   }
-  SESSION_EMAIL = session;
-  const user = getStoredUser(session);
-  if (!user) {
-    document.getElementById('login-overlay').classList.remove('hidden');
-    return;
+
+  // ── 2. Legacy key (direct login from dashboard login overlay) ──
+  const legacyEmail = localStorage.getItem('rateradar_session');
+  if (legacyEmail) {
+    const user = getStoredUser(legacyEmail);
+    if (user) {
+      SESSION_EMAIL = legacyEmail;
+      // Upgrade to new token
+      const token = 'rr_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+      localStorage.setItem('rateradar_session_token', JSON.stringify({ token, email: legacyEmail, expires: Date.now() + 30*24*60*60*1000 }));
+      user.lastLogin = today;
+      saveStoredUser(user);
+      SESSION_USER = user;
+      if (!user.backendClientId) {
+        const ids = getBackendIds(user.email);
+        if (ids?.clientId) { user.backendClientId = ids.clientId; user.backendAirtableId = ids.airtableId; saveStoredUser(user); }
+      }
+      if (!user.onboardingComplete) { startOnboarding(); } else { applyUserData(user); }
+      return;
+    }
   }
-  user.lastLogin = new Date().toISOString().slice(0,10);
-  saveStoredUser(user);
-  SESSION_USER = user;
-  if (!user.onboardingComplete) {
-    startOnboarding();
-  } else {
-    applyUserData(user);
-  }
+
+  // ── 3. No valid session → redirect to marketing site ──
+  redirectToLogin();
 }
 
 // ============================================================
@@ -3679,6 +3732,7 @@ startupCheck();
     </div>
     <div class="login-title">Bon retour 👋</div>
     <div class="login-sub">Connectez-vous pour accéder à votre dashboard.</div>
+    <a href="index.html" style="display:inline-block;font-size:12px;color:#475569;text-decoration:none;margin-bottom:18px;transition:color .15s" onmouseover="this.style.color='#94a3b8'" onmouseout="this.style.color='#475569'">← Retour au site</a>
     <div class="login-field"><label class="login-label">Adresse email</label><input class="login-input" id="login-email" type="email" placeholder="contact@monhotel.com"></div>
     <div class="login-field"><label class="login-label">Mot de passe</label><input class="login-input" id="login-pass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')tryLogin()"></div>
     <button class="btn btn-primary" style="width:100%;justify-content:center;padding:12px;font-size:14px;margin-top:6px" onclick="tryLogin()">Connexion →</button>

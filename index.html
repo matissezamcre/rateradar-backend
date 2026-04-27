@@ -1639,6 +1639,7 @@ function doLogin(){
 
 function logout(){
   localStorage.removeItem('rr_current');
+  localStorage.removeItem('rateradar_session_token');
   updateNavAuth();
   closeDropdown();
 }
@@ -2189,14 +2190,73 @@ function closePayModalOverlay(e){
 
 // loginUser — handles post-auth plan redirect
 function loginUser(user){
+  // 1. Keep existing marketing-site state
   setCurrentUser(user);
   updateNavAuth();
-  const pending=localStorage.getItem('rr_pending_plan');
-  if(pending!==null){
+
+  // 2. Write unified 30-day session token
+  const token = 'rr_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+  localStorage.setItem('rateradar_session_token', JSON.stringify({
+    token, email: user.email,
+    expires: Date.now() + 30 * 24 * 60 * 60 * 1000
+  }));
+
+  // 3. Seed dashboard user record if it doesn't exist yet
+  const dashKey = 'rateradar_user_' + user.email;
+  if (!localStorage.getItem(dashKey)) {
+    const today = new Date().toISOString().slice(0,10);
+    localStorage.setItem(dashKey, JSON.stringify({
+      email: user.email,
+      firstName: (user.name||'').split(' ')[0],
+      hotelName: '', city: '', rooms: 0, currentPrice: 0, stars: 4,
+      competitors: [],
+      notifications: { email:true, dailySummary:true, weeklyReport:true },
+      preferences: {
+        primaryColor:'#3B82F6', background:'dark', fontSize:'medium',
+        widgets:{ alertBanner:true,kpiAvgPrice:true,kpiPosition:true,kpiAlerts:true,kpiWeekend:true,priceTable:true,insights:true,positionBar:true },
+        widgetOrder:['alertBanner','kpiCards','priceTable','insights','positionBar']
+      },
+      onboardingComplete: false,
+      createdAt: today, lastLogin: today,
+      plan: user.lockedPlan || 'Starter',
+      earlyAdopter: user.earlyAdopter || false,
+      lockedPrice: user.lockedPrice || 149,
+      backendClientId: null, backendAirtableId: null
+    }));
+  }
+
+  // 4. Handle pending plan selection
+  const pending = localStorage.getItem('rr_pending_plan');
+  if (pending !== null) {
     localStorage.removeItem('rr_pending_plan');
     closeModal();
-    setTimeout(()=>openPayModal(parseInt(pending)),400);
+    setTimeout(() => openPayModal(parseInt(pending)), 400);
+    return; // stay on page for payment
   }
+
+  // 5. Show loading screen and redirect to dashboard
+  closeModal();
+  showRedirectScreen();
+}
+
+function showRedirectScreen() {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:#020B18;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;font-family:Inter,sans-serif;opacity:0;transition:opacity .3s ease';
+  overlay.innerHTML = `
+    <div style="text-align:center">
+      <div style="font-size:44px;margin-bottom:14px">📡</div>
+      <div style="font-size:22px;font-weight:800;color:#f1f5f9;margin-bottom:8px;letter-spacing:-.5px">RateRadar</div>
+      <div style="font-size:14px;color:#64748b;margin-bottom:32px">Préparation de votre dashboard…</div>
+      <div style="width:180px;height:3px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden;margin:0 auto">
+        <div id="rr-progress-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#3B82F6,#8B5CF6);border-radius:3px;transition:width 1s ease"></div>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => {
+    overlay.style.opacity = '1';
+    setTimeout(() => { document.getElementById('rr-progress-bar').style.width = '100%'; }, 50);
+  });
+  setTimeout(() => { window.location.href = 'dashboard.html'; }, 1100);
 }
 
 // Card number formatter
@@ -2259,11 +2319,29 @@ function init(){
   renderPlans();
   renderFaq();
   renderTestimonials();
+
+  // Restore session from token if rr_current was cleared (e.g. browser restart)
+  if(!getCurrentUser()){
+    try{
+      const td=JSON.parse(localStorage.getItem('rateradar_session_token')||'null');
+      if(td&&td.expires>Date.now()){
+        const u=getUsers().find(u=>u.email===td.email);
+        if(u) setCurrentUser(u);
+      }
+    }catch(e){}
+  }
+
   updateNavAuth();
   checkUrlConfirmToken();
   checkUrlResetToken();
   updateHeroUrgencyBanner();
   triggerReveal();
+
+  // Open login modal if redirected from dashboard with #login
+  if(window.location.hash==='#login'){
+    window.history.replaceState({},'',window.location.pathname);
+    setTimeout(()=>openModal('login'),200);
+  }
 }
 init();
 
