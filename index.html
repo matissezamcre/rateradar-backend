@@ -494,6 +494,7 @@ textarea.ap-input{resize:vertical;min-height:80px;}
     </div>
     <div class="user-dropdown" id="user-dropdown">
       <button class="dropdown-item" onclick="showSection('home');closeDropdown()">Mon compte</button>
+      <button class="dropdown-item danger" onclick="openDeleteModal();closeDropdown()">🗑️ Supprimer mon compte</button>
       <button class="dropdown-item danger" onclick="logout()">Déconnexion</button>
     </div>
   </div>
@@ -2265,6 +2266,108 @@ function init(){
   triggerReveal();
 }
 init();
+
+// ── DELETE ACCOUNT ──────────────────────────────────────────
+function openDeleteModal() {
+  document.getElementById('delete-step-1').style.display = 'block';
+  document.getElementById('delete-step-2').style.display = 'none';
+  document.getElementById('del-confirm-input').value = '';
+  document.getElementById('del-match-msg').style.display = 'none';
+  const btn = document.getElementById('del-confirm-btn');
+  btn.disabled = true; btn.style.opacity = '.4'; btn.style.cursor = 'not-allowed';
+  document.getElementById('modal-delete').style.display = 'flex';
+}
+function closeDeleteModal() {
+  document.getElementById('modal-delete').style.display = 'none';
+}
+function deleteGoStep2() {
+  const user = getCurrentUser();
+  document.getElementById('delete-step-1').style.display = 'none';
+  document.getElementById('delete-step-2').style.display = 'block';
+  document.getElementById('del-email-hint').textContent = user?.email || '—';
+  document.getElementById('del-confirm-input').focus();
+}
+function deleteGoStep1() {
+  document.getElementById('delete-step-1').style.display = 'block';
+  document.getElementById('delete-step-2').style.display = 'none';
+}
+function checkDelConfirm() {
+  const user = getCurrentUser();
+  const val  = document.getElementById('del-confirm-input').value.trim().toLowerCase();
+  const match = val === (user?.email || '').toLowerCase();
+  const btn = document.getElementById('del-confirm-btn');
+  const msg = document.getElementById('del-match-msg');
+  btn.disabled = !match;
+  btn.style.opacity = match ? '1' : '.4';
+  btn.style.cursor  = match ? 'pointer' : 'not-allowed';
+  msg.style.display = (val.length > 3 && !match) ? 'block' : 'none';
+}
+function confirmDeleteAccount() {
+  const user = getCurrentUser();
+  if (!user) return;
+  const email = user.email;
+
+  // Supprimer de rr_users
+  const users = getUsers().filter(u => u.email !== email);
+  saveUsers(users);
+  // Supprimer les données de session / backend ids
+  localStorage.removeItem('rr_current');
+  localStorage.removeItem('rr_backend_' + email);
+  // Supprimer les données en attente
+  Object.keys(localStorage).filter(k => k.startsWith('rr_pending_')).forEach(k => localStorage.removeItem(k));
+
+  closeDeleteModal();
+  updateNavAuth();
+
+  // Écran d'au revoir
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.9);display:flex;align-items:center;justify-content:center;z-index:9999;font-family:Inter,sans-serif';
+  overlay.innerHTML = '<div style="text-align:center;color:#fff"><div style="font-size:48px;margin-bottom:16px">👋</div><div style="font-size:22px;font-weight:700;margin-bottom:8px">Compte supprimé</div><div style="font-size:15px;color:#94a3b8">À bientôt…</div></div>';
+  document.body.appendChild(overlay);
+  setTimeout(() => { overlay.remove(); }, 2500);
+}
 </script>
+
+<!-- MODAL SUPPRESSION COMPTE -->
+<div id="modal-delete" onclick="if(event.target===this)closeDeleteModal()"
+  style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(8px);z-index:3000;align-items:center;justify-content:center;padding:24px">
+  <div style="background:#0A1128;border:1px solid rgba(239,68,68,.3);border-radius:20px;padding:32px;width:100%;max-width:420px;position:relative;box-shadow:0 40px 100px rgba(0,0,0,.7)">
+    <button onclick="closeDeleteModal()" style="position:absolute;top:14px;right:14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:8px;width:30px;height:30px;cursor:pointer;color:#94a3b8;font-size:15px">✕</button>
+
+    <div style="font-size:1.2rem;font-weight:800;color:#ef4444;margin-bottom:20px">🗑️ Supprimer mon compte</div>
+
+    <!-- Étape 1 : avertissement -->
+    <div id="delete-step-1">
+      <div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:12px;padding:16px;margin-bottom:18px">
+        <div style="font-size:13px;font-weight:700;color:#ef4444;margin-bottom:10px">Ce qui sera supprimé définitivement :</div>
+        <div style="display:flex;flex-direction:column;gap:7px;font-size:13px;color:#94a3b8">
+          <div><span style="color:#ef4444">✗</span> Votre profil et mot de passe</div>
+          <div><span style="color:#ef4444">✗</span> Tous vos concurrents configurés</div>
+          <div><span style="color:#ef4444">✗</span> Tout l'historique des prix</div>
+          <div><span style="color:#ef4444">✗</span> Toutes vos alertes</div>
+        </div>
+      </div>
+      <p style="font-size:13px;color:#94a3b8;margin:0 0 20px">Cette action est <strong style="color:#f1f5f9">irréversible</strong>.</p>
+      <div style="display:flex;gap:10px">
+        <button onclick="closeDeleteModal()" style="flex:1;padding:10px;border-radius:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:#94a3b8;font-weight:600;cursor:pointer;font-size:14px">Annuler</button>
+        <button onclick="deleteGoStep2()" style="flex:1;padding:10px;border-radius:10px;background:#ef4444;border:none;color:#fff;font-weight:600;cursor:pointer;font-size:14px">Je comprends →</button>
+      </div>
+    </div>
+
+    <!-- Étape 2 : confirmation par email -->
+    <div id="delete-step-2" style="display:none">
+      <p style="font-size:14px;color:#94a3b8;margin:0 0 12px">Tapez votre adresse email pour confirmer :</p>
+      <div id="del-email-hint" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:9px 14px;font-size:13px;font-weight:600;color:#64748b;margin-bottom:12px;letter-spacing:.3px">—</div>
+      <input id="del-confirm-input" type="email" oninput="checkDelConfirm()" placeholder="Votre email"
+        style="width:100%;box-sizing:border-box;padding:10px 14px;border-radius:10px;background:#0F1A35;border:1px solid rgba(255,255,255,.12);color:#f1f5f9;font-size:14px;margin-bottom:8px;outline:none">
+      <div id="del-match-msg" style="font-size:12px;color:#ef4444;margin-bottom:12px;display:none">❌ L'email ne correspond pas.</div>
+      <div style="display:flex;gap:10px;margin-top:6px">
+        <button onclick="deleteGoStep1()" style="flex:1;padding:10px;border-radius:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:#94a3b8;font-weight:600;cursor:pointer;font-size:14px">← Retour</button>
+        <button id="del-confirm-btn" disabled onclick="confirmDeleteAccount()" style="flex:1;padding:10px;border-radius:10px;background:#ef4444;border:none;color:#fff;font-weight:600;font-size:14px;opacity:.4;cursor:not-allowed">🗑️ Supprimer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
