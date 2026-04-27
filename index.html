@@ -954,8 +954,8 @@ textarea.ap-input{resize:vertical;min-height:80px;}
     <div class="pay-success" id="pay-success">
       <div class="pay-success-icon">🎉</div>
       <div class="pay-success-title">Bienvenue sur RateRadar !</div>
-      <p class="pay-success-text">Votre essai gratuit de 14 jours commence maintenant.<br>Vous recevrez un email de confirmation avec vos accès dans les prochaines minutes.</p>
-      <button class="btn-primary" style="margin-top:28px;padding:13px 32px;" onclick="closePayModal()">Accéder à mon tableau de bord →</button>
+      <p class="pay-success-text">Votre abonnement est activé.<br>Vous allez être redirigé vers votre dashboard dans quelques secondes…</p>
+      <button class="btn-primary" style="margin-top:28px;padding:13px 32px;" onclick="showRedirectScreen()">Accéder à mon dashboard maintenant →</button>
     </div>
   </div>
 </div>
@@ -1577,22 +1577,26 @@ function checkUrlConfirmToken(){
     return;
   }
   const p=JSON.parse(raw);
-  // activate the user
+  // activate the user (no redirect — they haven't paid yet)
   const users=getUsers();
   if(!users.find(u=>u.email===p.email)){
     const ea = isLaunchPhase();
     const newUser={name:p.name,email:p.email,pwd:p.pwd,date:p.date,isAdmin:p.isAdmin,confirmed:true,
-      earlyAdopter:ea, lockedPlan:'Starter', lockedPrice:ea?LAUNCH_PRICES_MONTHLY[0]:NORMAL_PRICES_MONTHLY[0]};
+      earlyAdopter:ea, lockedPlan:'Starter', lockedPrice:ea?LAUNCH_PRICES_MONTHLY[0]:NORMAL_PRICES_MONTHLY[0],
+      hasPaid:false};
     users.push(newUser);
     saveUsers(users);
     incrementClientCount();
-    syncClientToBackend(newUser); // async, non-blocking
-    loginUser(newUser);
+    syncClientToBackend(newUser);
+    setCurrentUser(newUser);
+    updateNavAuth();
   }
   localStorage.removeItem('rr_pending_'+token);
   localStorage.removeItem('rr_last_confirm_token');
   window.history.replaceState({},'',window.location.pathname);
   showConfirmedToast();
+  // Scroll to pricing after a beat so they choose a plan
+  setTimeout(()=>showSection('pricing'), 2000);
 }
 
 function showConfirmedToast(){
@@ -2188,55 +2192,39 @@ function closePayModalOverlay(e){
   if(e.target===document.getElementById('payment-modal')) closePayModal();
 }
 
-// loginUser — handles post-auth plan redirect
+// loginUser — called after sign-in or email confirmation
 function loginUser(user){
-  // 1. Keep existing marketing-site state
   setCurrentUser(user);
   updateNavAuth();
 
-  // 2. Write unified 30-day session token
-  const token = 'rr_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
-  localStorage.setItem('rateradar_session_token', JSON.stringify({
-    token, email: user.email,
-    expires: Date.now() + 30 * 24 * 60 * 60 * 1000
-  }));
-
-  // 3. Seed dashboard user record if it doesn't exist yet
-  const dashKey = 'rateradar_user_' + user.email;
-  if (!localStorage.getItem(dashKey)) {
-    const today = new Date().toISOString().slice(0,10);
-    localStorage.setItem(dashKey, JSON.stringify({
-      email: user.email,
-      firstName: (user.name||'').split(' ')[0],
-      hotelName: '', city: '', rooms: 0, currentPrice: 0, stars: 4,
-      competitors: [],
-      notifications: { email:true, dailySummary:true, weeklyReport:true },
-      preferences: {
-        primaryColor:'#3B82F6', background:'dark', fontSize:'medium',
-        widgets:{ alertBanner:true,kpiAvgPrice:true,kpiPosition:true,kpiAlerts:true,kpiWeekend:true,priceTable:true,insights:true,positionBar:true },
-        widgetOrder:['alertBanner','kpiCards','priceTable','insights','positionBar']
-      },
-      onboardingComplete: false,
-      createdAt: today, lastLogin: today,
-      plan: user.lockedPlan || 'Starter',
-      earlyAdopter: user.earlyAdopter || false,
-      lockedPrice: user.lockedPrice || 149,
-      backendClientId: null, backendAirtableId: null
-    }));
-  }
-
-  // 4. Handle pending plan selection
+  // If user arrived here mid-purchase flow → open the payment modal
   const pending = localStorage.getItem('rr_pending_plan');
   if (pending !== null) {
     localStorage.removeItem('rr_pending_plan');
     closeModal();
     setTimeout(() => openPayModal(parseInt(pending)), 400);
-    return; // stay on page for payment
+    return;
   }
 
-  // 5. Show loading screen and redirect to dashboard
+  // Paying customers (or admin) → write token + go to dashboard
+  if (user.hasPaid || user.isAdmin) {
+    const token = 'rr_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    localStorage.setItem('rateradar_session_token', JSON.stringify({
+      token, email: user.email,
+      expires: Date.now() + 30 * 24 * 60 * 60 * 1000
+    }));
+    closeModal();
+    showRedirectScreen();
+    return;
+  }
+
+  // Not yet a paying customer → stay on site, nudge toward pricing
   closeModal();
-  showRedirectScreen();
+  const t = document.createElement('div');
+  t.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:#1E293B;border:1px solid rgba(99,102,241,.4);color:#f1f5f9;font-family:Inter,sans-serif;font-size:.875rem;font-weight:500;padding:12px 22px;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;gap:12px;white-space:nowrap';
+  t.innerHTML = 'Bonjour ' + (user.name||'').split(' ')[0] + ' 👋 &nbsp;<button onclick="showSection(\'pricing\');this.closest(\'div\').remove()" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);border:none;color:#fff;padding:5px 14px;border-radius:8px;cursor:pointer;font-size:.8rem;font-weight:600">Choisir un plan →</button><button onclick="this.closest(\'div\').remove()" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:16px;padding:0 4px">✕</button>';
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 6000);
 }
 
 function showRedirectScreen() {
@@ -2280,7 +2268,7 @@ function processPayment(){
   const card=document.getElementById('pay-card').value.replace(/\s/g,'');
   const expiry=document.getElementById('pay-expiry').value.replace(/\s/g,'');
   const cvv=document.getElementById('pay-cvv').value.trim();
-  const email=document.getElementById('pay-email').value.trim();
+  const email=document.getElementById('pay-email').value.trim().toLowerCase();
   const errEl=document.getElementById('pay-error');
   errEl.classList.remove('show');
 
@@ -2290,7 +2278,6 @@ function processPayment(){
   if(cvv.length<3) return showPayError('Code CVV invalide.');
   if(!email||!email.includes('@')) return showPayError('Email de facturation invalide.');
 
-  // simulate payment processing
   const btn=document.getElementById('pay-submit-btn');
   btn.disabled=true;
   document.getElementById('pay-btn-text').innerHTML='<span class="spinner"></span> Traitement en cours…';
@@ -2298,7 +2285,63 @@ function processPayment(){
   setTimeout(()=>{
     document.getElementById('pay-form-wrap').style.display='none';
     document.getElementById('pay-success').classList.add('show');
+    onPaymentSuccess(email, name);
   },1800);
+}
+
+function onPaymentSuccess(email, name) {
+  const plans = getPlansData();
+  const plan  = plans[_payPlanIndex] || plans[0];
+  const ea    = isLaunchPhase();
+  const price = ea ? LAUNCH_PRICES_MONTHLY[_payPlanIndex] : NORMAL_PRICES_MONTHLY[_payPlanIndex];
+
+  // Create or update user in rr_users
+  let users = getUsers();
+  let user  = users.find(u => u.email === email);
+  if (user) {
+    user.lockedPlan  = plan.name;
+    user.lockedPrice = price;
+    user.earlyAdopter= ea;
+    user.hasPaid     = true;
+    users[users.findIndex(u => u.email === email)] = user;
+  } else {
+    user = { name, email, pwd:'', date:new Date().toISOString(), isAdmin:false, confirmed:true,
+      earlyAdopter:ea, lockedPlan:plan.name, lockedPrice:price, hasPaid:true };
+    users.push(user);
+  }
+  saveUsers(users);
+  setCurrentUser(user);
+  updateNavAuth();
+
+  // Unified 30-day session token
+  const token = 'rr_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+  localStorage.setItem('rateradar_session_token', JSON.stringify({ token, email, expires: Date.now() + 30*24*60*60*1000 }));
+
+  // Create/update dashboard user record
+  const dashKey = 'rateradar_user_' + email;
+  const today   = new Date().toISOString().slice(0,10);
+  try {
+    const existing = JSON.parse(localStorage.getItem(dashKey) || 'null');
+    const dashUser  = existing || {
+      email, firstName: name.split(' ')[0],
+      hotelName:'', city:'', rooms:0, currentPrice:0, stars:4, competitors:[],
+      notifications:{ email:true, dailySummary:true, weeklyReport:true },
+      preferences:{ primaryColor:'#3B82F6', background:'dark', fontSize:'medium',
+        widgets:{ alertBanner:true,kpiAvgPrice:true,kpiPosition:true,kpiAlerts:true,kpiWeekend:true,priceTable:true,insights:true,positionBar:true },
+        widgetOrder:['alertBanner','kpiCards','priceTable','insights','positionBar'] },
+      onboardingComplete:false, createdAt:today, lastLogin:today,
+      backendClientId:null, backendAirtableId:null
+    };
+    dashUser.plan        = plan.name;
+    dashUser.earlyAdopter= ea;
+    dashUser.lockedPrice = price;
+    localStorage.setItem(dashKey, JSON.stringify(dashUser));
+  } catch(e) {}
+
+  syncClientToBackend(user);
+
+  // Auto-redirect to dashboard after 3.5 s (user can also click the button)
+  setTimeout(() => showRedirectScreen(), 3500);
 }
 function showPayError(msg){
   const el=document.getElementById('pay-error');

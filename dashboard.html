@@ -1073,11 +1073,11 @@ input[type="date"]:focus,select:focus,.filter-input:focus{border-color:var(--blu
         </div>
         <div class="toggle-row">
           <div class="toggle-info"><div class="tn">Rapport hebdomadaire</div></div>
-          <button class="toggle on" onclick="this.classList.toggle('on')"></button>
+          <button class="toggle on" data-feature="weekly-report" onclick="this.classList.toggle('on')"></button>
         </div>
         <div class="toggle-row">
           <div class="toggle-info"><div class="tn">Alertes SMS <span class="pro-badge">PRO</span></div><div class="ts">Disponible avec le plan Pro</div></div>
-          <button class="toggle" onclick="toast('Upgrade requis','Passez au plan Pro pour activer les SMS','#F59E0B')"></button>
+          <button class="toggle" data-feature="sms" onclick="toast('Upgrade requis','Passez au plan Pro pour activer les SMS','#F59E0B')"></button>
         </div>
         <div style="margin-top:14px">
           <button class="btn btn-primary btn-sm">💾 Sauvegarder les préférences</button>
@@ -1124,8 +1124,8 @@ input[type="date"]:focus,select:focus,.filter-input:focus{border-color:var(--blu
           <button class="toggle on" onclick="this.classList.toggle('on')"></button>
         </div>
         <div class="toggle-row">
-          <div class="toggle-info"><div class="tn">Alertes SMS <span class="pro-badge">PRO</span></div><div class="ts">Nécessite le plan Pro</div></div>
-          <button class="toggle" onclick="toast('Plan Pro','Passez au plan Pro pour activer les SMS','#F59E0B')"></button>
+          <div class="toggle-info"><div class="tn">Alertes SMS <span class="pro-badge">PRO</span></div><div class="ts">Disponible à partir du plan Pro</div></div>
+          <button class="toggle" data-feature="sms" onclick="toast('Plan Pro','Passez au plan Pro pour activer les SMS','#F59E0B')"></button>
         </div>
         <div class="toggle-row">
           <div class="toggle-info"><div class="tn">Rapport hebdomadaire</div><div class="ts">Chaque lundi matin</div></div>
@@ -1176,6 +1176,15 @@ input[type="date"]:focus,select:focus,.filter-input:focus{border-color:var(--blu
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- UPGRADE BANNER (Starter only) -->
+  <div id="plan-upgrade-banner" style="display:none;margin-top:20px;background:linear-gradient(135deg,rgba(99,102,241,.12),rgba(139,92,246,.08));border:1px solid rgba(99,102,241,.3);border-radius:14px;padding:18px 22px;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+    <div>
+      <div style="font-size:14px;font-weight:700;color:#c7d2fe;margin-bottom:4px">🚀 Passez au plan Pro</div>
+      <div style="font-size:13px;color:#94a3b8">Débloquez les alertes SMS, 15 concurrents, l'historique 90 jours et les rapports hebdomadaires.</div>
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="navigate('billing')" style="flex-shrink:0;background:linear-gradient(135deg,#6366f1,#8b5cf6);white-space:nowrap">⚡ Voir les plans</button>
   </div>
 
   <!-- DANGER ZONE -->
@@ -2926,6 +2935,14 @@ async function addSettingsCompetitor() {
   const name   = (nameEl?.value || '').trim();
   const url    = (urlEl?.value  || '').trim();
   if (!name) { toast('Requis', 'Entrez le nom de l\'hôtel', '#EF4444'); return; }
+  // Plan limit check
+  const f = getPlanFeatures(SESSION_USER?.plan);
+  const currentCount = (SESSION_USER?.competitors || []).length;
+  if (f.maxCompetitors !== Infinity && currentCount >= f.maxCompetitors) {
+    const next = f.maxCompetitors === 5 ? 'Pro (15 concurrents)' : 'Premium (illimités)';
+    toast('Limite ' + f.label + ' atteinte 🔒', `Passez au plan ${next} pour ajouter plus de concurrents.`, '#F59E0B');
+    return;
+  }
   const comp = { name, url };
   if (!SESSION_USER.competitors) SESSION_USER.competitors = [];
   SESSION_USER.competitors.push(comp);
@@ -2960,6 +2977,63 @@ async function triggerManualScrape() {
   if (res?.success) {
     toast('Scraping terminé ✓', 'Les nouveaux prix seront visibles dans le dashboard', '#10B981');
   }
+}
+
+// ============================================================
+// ============================================================
+// PLAN FEATURES
+// ============================================================
+const PLAN_FEATURES = {
+  STARTER: { maxCompetitors:5,  smsAlerts:false, apiAccess:false, historyDays:30,  weeklyReport:false, label:'Starter' },
+  PRO:     { maxCompetitors:15, smsAlerts:true,  apiAccess:false, historyDays:90,  weeklyReport:true,  label:'Pro'     },
+  PREMIUM: { maxCompetitors:Infinity, smsAlerts:true, apiAccess:true, historyDays:365, weeklyReport:true, label:'Premium' },
+};
+function getPlanFeatures(plan) {
+  return PLAN_FEATURES[(plan||'STARTER').toUpperCase()] || PLAN_FEATURES.STARTER;
+}
+function applyPlanGating(plan) {
+  const f = getPlanFeatures(plan);
+  const planLabel = f.label;
+
+  // ── SMS toggles ──
+  document.querySelectorAll('[data-feature="sms"]').forEach(btn => {
+    if (f.smsAlerts) {
+      btn.title = '';
+      btn.onclick = () => btn.classList.toggle('on');
+    } else {
+      btn.classList.remove('on');
+      btn.onclick = () => toast('Plan Pro requis 📱', 'Les alertes SMS sont disponibles à partir du plan Pro.', '#F59E0B');
+    }
+  });
+
+  // ── Weekly report toggle ──
+  document.querySelectorAll('[data-feature="weekly-report"]').forEach(btn => {
+    if (f.weeklyReport) {
+      btn.onclick = () => btn.classList.toggle('on');
+    } else {
+      btn.classList.remove('on');
+      btn.onclick = () => toast('Plan Pro requis 📊', 'Les rapports hebdomadaires sont disponibles à partir du plan Pro.', '#F59E0B');
+    }
+  });
+
+  // ── Competitor count badge in settings title ──
+  const compTitle = document.getElementById('comp-settings-title');
+  if (compTitle) {
+    const maxLabel = f.maxCompetitors === Infinity ? 'illimités' : 'max ' + f.maxCompetitors;
+    compTitle.innerHTML = `🏁 Mes concurrents <span style="font-size:11px;font-weight:500;color:var(--muted2);margin-left:6px">(${maxLabel} · ${planLabel})</span>`;
+  }
+
+  // ── Plan name in settings subscription card ──
+  const planNameEl = document.getElementById('settings-plan-name');
+  if (planNameEl) planNameEl.textContent = planLabel;
+
+  // ── Upgrade banner for Starter ──
+  const banner = document.getElementById('plan-upgrade-banner');
+  if (banner) banner.style.display = (plan||'').toUpperCase() === 'STARTER' ? 'flex' : 'none';
+
+  // ── History days label ──
+  const histLabel = document.getElementById('history-days-label');
+  if (histLabel) histLabel.textContent = f.historyDays === 365 ? 'Illimité' : f.historyDays + ' jours';
 }
 
 // ============================================================
@@ -3240,6 +3314,7 @@ function applyUserData(user) {
   }
   if (user.preferences) applyPreferences(user.preferences);
   applyWidgetVisibility(user.preferences?.widgets || DEFAULT_PREFS.widgets);
+  applyPlanGating(user.plan || 'Starter');
   if (user.email === ADMIN_EMAIL) showAdminUI();
 }
 
