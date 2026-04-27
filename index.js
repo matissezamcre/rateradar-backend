@@ -20,6 +20,8 @@ app.use(cors({
   origin: [
     'http://localhost:3000',
     'https://rateradar.io',
+    'https://rateradar-peach.vercel.app',
+    /^https:\/\/.*\.vercel\.app$/,
     /^file:\/\//,
   ],
   credentials: true,

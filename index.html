@@ -1261,26 +1261,35 @@ function getBackendIds(email) { try { return JSON.parse(localStorage.getItem('rr
 function setBackendIds(email, data) { localStorage.setItem('rr_backend_'+email, JSON.stringify(data)); }
 
 async function syncClientToBackend(user) {
+  const payload = {
+    name: user.name,
+    email: user.email,
+    hotelName: 'En attente',
+    hotelCity: 'En attente',
+    plan: user.lockedPlan || 'starter',
+  };
+  console.log('%c[RateRadar] → Envoi vers Railway', 'color:#6366f1;font-weight:bold;font-size:14px', payload);
   try {
     const res = await Promise.race([
       fetch(API_BASE + '/api/clients', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: user.name,
-          email: user.email,
-          hotelName: 'En attente',
-          hotelCity: 'En attente',
-          plan: user.lockedPlan || 'starter',
-        })
+        body: JSON.stringify(payload)
       }),
       new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 6000))
     ]);
     const data = await res.json();
+    console.log('%c[RateRadar] ← Réponse Railway', 'color:#10b981;font-weight:bold;font-size:14px', data);
     if (data?.success && data.data?.clientId) {
       setBackendIds(user.email, { airtableId: data.data.id, clientId: data.data.clientId });
+      alert('✅ Railway OK !\n\nClientId: ' + data.data.clientId + '\nAirtable ID: ' + data.data.id);
+    } else {
+      alert('⚠️ Railway a répondu mais sans succès :\n\n' + JSON.stringify(data, null, 2));
     }
-  } catch(e) { console.warn('[backend] client sync failed (offline?):', e.message); }
+  } catch(e) {
+    console.error('%c[RateRadar] ✗ Erreur Railway', 'color:#ef4444;font-weight:bold;font-size:14px', e.message);
+    alert('❌ Erreur Railway : ' + e.message + '\n\nVérifie la console pour plus de détails.');
+  }
 }
 
 function getUsers(){return JSON.parse(localStorage.getItem('rr_users')||'[]');}
