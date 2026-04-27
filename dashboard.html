@@ -1178,6 +1178,18 @@ input[type="date"]:focus,select:focus,.filter-input:focus{border-color:var(--blu
     </div>
   </div>
 
+  <!-- DANGER ZONE -->
+  <div class="settings-section" style="margin-top:24px;border-color:rgba(239,68,68,0.3);background:rgba(239,68,68,0.04)">
+    <h3 style="color:var(--red);border-bottom-color:rgba(239,68,68,0.2)">⚠️ Zone dangereuse</h3>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+      <div>
+        <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">Supprimer définitivement mon compte</div>
+        <div style="font-size:13px;color:var(--muted2)">Toutes vos données, concurrents et historique de prix seront effacés. Cette action est irréversible.</div>
+      </div>
+      <button class="btn btn-danger btn-sm" style="flex-shrink:0;white-space:nowrap" onclick="openDeleteAccountModal()">🗑️ Supprimer mon compte</button>
+    </div>
+  </div>
+
 </div>
 
 <!-- PAGE 6: FACTURATION -->
@@ -2617,6 +2629,7 @@ function confirmEmailInvoice() {
 document.addEventListener('click', e => {
   if (e.target.id === 'modal-email-invoice') closeEmailInvoiceModal();
   if (e.target.id === 'modal-cancel-sub') closeCancelModal();
+  if (e.target.id === 'modal-delete-account') closeDeleteAccountModal();
 });
 
 // ============================================================
@@ -3550,6 +3563,79 @@ function logout() {
 }
 
 // ============================================================
+// DELETE ACCOUNT
+// ============================================================
+function openDeleteAccountModal() {
+  document.getElementById('delete-step-1').style.display = 'block';
+  document.getElementById('delete-step-2').style.display = 'none';
+  document.getElementById('delete-confirm-input').value = '';
+  document.getElementById('delete-match-msg').style.display = 'none';
+  const btn = document.getElementById('delete-confirm-btn');
+  btn.disabled = true; btn.style.opacity = '.4'; btn.style.cursor = 'not-allowed';
+  document.getElementById('modal-delete-account').classList.add('open');
+}
+function closeDeleteAccountModal() {
+  document.getElementById('modal-delete-account').classList.remove('open');
+}
+function deleteStep2() {
+  document.getElementById('delete-step-1').style.display = 'none';
+  document.getElementById('delete-step-2').style.display = 'block';
+  document.getElementById('delete-email-hint').textContent = SESSION_EMAIL || '—';
+  document.getElementById('delete-confirm-input').focus();
+}
+function deleteStep1() {
+  document.getElementById('delete-step-1').style.display = 'block';
+  document.getElementById('delete-step-2').style.display = 'none';
+}
+function checkDeleteConfirm() {
+  const val = document.getElementById('delete-confirm-input').value.trim().toLowerCase();
+  const match = val === (SESSION_EMAIL || '').toLowerCase();
+  const btn = document.getElementById('delete-confirm-btn');
+  const msg = document.getElementById('delete-match-msg');
+  btn.disabled = !match;
+  btn.style.opacity = match ? '1' : '.4';
+  btn.style.cursor  = match ? 'pointer' : 'not-allowed';
+  msg.style.display = (val.length > 3 && !match) ? 'block' : 'none';
+}
+async function confirmDeleteAccount() {
+  if (!SESSION_EMAIL) return;
+  const email = SESSION_EMAIL;
+
+  // 1. Try to delete from backend
+  const ids = getBackendIds(email);
+  if (ids?.airtableId) {
+    try {
+      await apiRequest('DELETE', '/api/clients/' + ids.airtableId);
+    } catch(e) { console.warn('[delete] backend removal failed:', e.message); }
+  }
+
+  // 2. Wipe all localStorage data for this user
+  localStorage.removeItem(RR_KEY(email));          // rateradar_user_{email}
+  localStorage.removeItem('rr_backend_' + email);  // backend IDs
+  localStorage.removeItem('rateradar_session');
+  // Remove from rateradar_users index
+  const all = getAllStoredUsers().filter(u => u.email !== email);
+  localStorage.setItem('rateradar_users', JSON.stringify(all));
+  // Remove from rr_users (marketing site)
+  try {
+    const rrUsers = JSON.parse(localStorage.getItem('rr_users') || '[]').filter(u => u.email !== email);
+    localStorage.setItem('rr_users', JSON.stringify(rrUsers));
+    localStorage.removeItem('rr_current');
+  } catch(e) {}
+
+  // 3. Reset session
+  SESSION_EMAIL = null; SESSION_USER = null; ADMIN_VIEWING = null;
+
+  // 4. Show farewell and redirect
+  closeDeleteAccountModal();
+  const t = document.createElement('div');
+  t.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:99999;font-family:Inter,sans-serif';
+  t.innerHTML = '<div style="text-align:center;color:#fff"><div style="font-size:48px;margin-bottom:16px">👋</div><div style="font-size:22px;font-weight:700;margin-bottom:8px">Compte supprimé</div><div style="font-size:15px;color:#94a3b8">Redirection dans 3 secondes…</div></div>';
+  document.body.appendChild(t);
+  setTimeout(() => { window.location.href = '/'; }, 3000);
+}
+
+// ============================================================
 // STARTUP CHECK
 // ============================================================
 function startupCheck() {
@@ -3817,6 +3903,48 @@ startupCheck();
 </div>
 
 <!-- MODAL: Email invoice -->
+<!-- ══ MODAL : SUPPRIMER LE COMPTE ══ -->
+<div class="imodal-overlay" id="modal-delete-account">
+  <div class="imodal" style="width:460px">
+    <div class="imodal-head">
+      <div class="imodal-title" style="color:var(--red)">🗑️ Supprimer mon compte</div>
+      <button class="imodal-close" onclick="closeDeleteAccountModal()">✕</button>
+    </div>
+
+    <!-- Step 1: Warning -->
+    <div id="delete-step-1">
+      <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:12px;padding:16px;margin:4px 0 20px">
+        <div style="font-size:13px;font-weight:700;color:var(--red);margin-bottom:10px">Ce qui sera supprimé définitivement :</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted2)"><span style="color:var(--red)">✗</span> Votre profil et informations d'hôtel</div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted2)"><span style="color:var(--red)">✗</span> Tous vos concurrents configurés</div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted2)"><span style="color:var(--red)">✗</span> Tout l'historique des prix</div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted2)"><span style="color:var(--red)">✗</span> Toutes vos alertes</div>
+        </div>
+      </div>
+      <p style="font-size:13px;color:var(--muted2);margin:0 0 20px">Cette action est <strong style="color:var(--text)">irréversible</strong>. Il n'y a aucun moyen de récupérer votre compte ensuite.</p>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-ghost btn-sm" style="flex:1" onclick="closeDeleteAccountModal()">Annuler</button>
+        <button class="btn btn-danger btn-sm" style="flex:1" onclick="deleteStep2()">Je comprends, continuer →</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Type email to confirm -->
+    <div id="delete-step-2" style="display:none">
+      <p style="font-size:14px;color:var(--muted2);margin:4px 0 16px">Pour confirmer, tapez votre adresse email ci-dessous :</p>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:13px;font-weight:600;color:var(--muted2);margin-bottom:12px;letter-spacing:.3px" id="delete-email-hint">—</div>
+      <input type="email" id="delete-confirm-input" class="form-input" placeholder="Votre email" oninput="checkDeleteConfirm()"
+        style="margin-bottom:16px;border:1px solid var(--border);background:var(--card2);color:var(--text)">
+      <div id="delete-match-msg" style="font-size:12px;color:var(--red);margin-bottom:14px;display:none">❌ L'email ne correspond pas.</div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-ghost btn-sm" style="flex:1" onclick="deleteStep1()">← Retour</button>
+        <button class="btn btn-danger btn-sm" style="flex:1;opacity:.4;cursor:not-allowed" id="delete-confirm-btn" disabled onclick="confirmDeleteAccount()">🗑️ Supprimer définitivement</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
 <div class="imodal-overlay" id="modal-email-invoice">
   <div class="imodal" style="width:400px">
     <div class="imodal-head">
