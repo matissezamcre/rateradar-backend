@@ -1254,6 +1254,34 @@ function updateHeroUrgencyBanner() {
 //  STORAGE HELPERS
 // ═══════════════════════════════════════
 const ADMIN_EMAIL = 'matisse.zamcre@gmail.com';
+const API_BASE = 'https://rateradar-backend-production.up.railway.app';
+
+// Shared localStorage key so the dashboard can pick up the Airtable IDs
+function getBackendIds(email) { try { return JSON.parse(localStorage.getItem('rr_backend_'+email)||'null'); } catch(e){ return null; } }
+function setBackendIds(email, data) { localStorage.setItem('rr_backend_'+email, JSON.stringify(data)); }
+
+async function syncClientToBackend(user) {
+  try {
+    const res = await Promise.race([
+      fetch(API_BASE + '/api/clients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: user.name,
+          email: user.email,
+          hotelName: 'En attente',
+          hotelCity: 'En attente',
+          plan: user.lockedPlan || 'starter',
+        })
+      }),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 6000))
+    ]);
+    const data = await res.json();
+    if (data?.success && data.data?.clientId) {
+      setBackendIds(user.email, { airtableId: data.data.id, clientId: data.data.clientId });
+    }
+  } catch(e) { console.warn('[backend] client sync failed (offline?):', e.message); }
+}
 
 function getUsers(){return JSON.parse(localStorage.getItem('rr_users')||'[]');}
 function saveUsers(u){localStorage.setItem('rr_users',JSON.stringify(u));}
@@ -1548,6 +1576,7 @@ function checkUrlConfirmToken(){
     users.push(newUser);
     saveUsers(users);
     incrementClientCount();
+    syncClientToBackend(newUser); // async, non-blocking
     loginUser(newUser);
   }
   localStorage.removeItem('rr_pending_'+token);

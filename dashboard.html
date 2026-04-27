@@ -382,6 +382,7 @@ input[type="date"]:focus,select:focus,.filter-input:focus{border-color:var(--blu
 .nav-bell{position:relative}
 .bell-badge{position:absolute;top:-4px;right:-4px;background:var(--red);color:#fff;border-radius:10px;font-size:9px;font-weight:800;padding:1px 5px;min-width:16px;text-align:center;border:1.5px solid var(--nav);animation:badgePop .3s cubic-bezier(.34,1.56,.64,1)}
 @keyframes badgePop{from{transform:scale(0)}to{transform:scale(1)}}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 
 /* NOTIFICATION DROPDOWN */
 #notif-panel{position:absolute;top:calc(var(--nav-h) - 4px);right:60px;width:380px;background:var(--card2);border:1px solid var(--border);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,0.04);z-index:300;overflow:hidden;transform-origin:top right;transform:scale(0.94) translateY(-8px);opacity:0;pointer-events:none;transition:transform .25s cubic-bezier(.22,.68,0,1.2),opacity .2s ease}
@@ -841,6 +842,7 @@ input[type="date"]:focus,select:focus,.filter-input:focus{border-color:var(--blu
       <button class="btn btn-secondary btn-sm" onclick="setAdminSimulation(7)">Simuler : 7 clients</button>
       <button class="btn btn-secondary btn-sm" onclick="setAdminSimulation(10)">Simuler : 10 clients (normal)</button>
       <button class="btn btn-secondary btn-sm" style="border-color:rgba(139,92,246,0.4);color:var(--violet)" onclick="sendPriceAlertTest(SESSION_EMAIL)">📧 Envoyer email test (alerte prix)</button>
+      <button class="btn btn-primary btn-sm" id="admin-scrape-btn" onclick="triggerManualScrape()" style="background:linear-gradient(135deg,var(--green),#059669)">🔍 Lancer le scraping maintenant</button>
       <span id="admin-pricing-saved" style="font-size:12px;color:var(--green);display:none">✓ Sauvegardé</span>
     </div>
   </div>
@@ -1138,9 +1140,13 @@ input[type="date"]:focus,select:focus,.filter-input:focus{border-color:var(--blu
 
     <div>
       <div class="settings-section" style="margin-bottom:16px">
-        <h3>🏁 Mes concurrents <span style="font-size:12px;color:var(--muted);font-weight:400">(7 / 10 actifs)</span></h3>
+        <h3 id="comp-settings-title">🏁 Mes concurrents</h3>
         <div class="comp-list" id="comp-settings-list"></div>
-        <button class="btn btn-secondary btn-sm" style="margin-top:12px" onclick="toast('Ajout concurrent','Entrez l\'URL Booking.com de l\'hôtel','#3B82F6')">+ Ajouter un concurrent</button>
+        <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-top:12px;align-items:center">
+          <input id="settings-new-comp-name" type="text" class="form-input" style="padding:7px 12px;font-size:12px;background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--text)" placeholder="Nom de l'hôtel">
+          <input id="settings-new-comp-url"  type="url"  class="form-input" style="padding:7px 12px;font-size:12px;background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--text)" placeholder="URL Booking.com (optionnel)">
+          <button class="btn btn-secondary btn-sm" onclick="addSettingsCompetitor()">+ Ajouter</button>
+        </div>
       </div>
 
       <div class="settings-section">
@@ -1520,6 +1526,51 @@ function initOverview() {
   renderPositionGauge();
   renderInsights();
   initCountUp();
+  loadLivePrices();
+}
+
+async function loadLivePrices() {
+  const clientId = SESSION_USER?.backendClientId;
+  if (!clientId) return;
+
+  // Show subtle loading indicator in table header
+  const table = document.getElementById('overview-table');
+  if (table) {
+    const liveTag = document.createElement('div');
+    liveTag.id = 'live-prices-loading';
+    liveTag.style.cssText = 'font-size:11px;color:var(--muted);margin-bottom:6px;display:flex;align-items:center;gap:6px';
+    liveTag.innerHTML = '<span style="animation:spin 1s linear infinite;display:inline-block">⟳</span> Chargement des prix en direct…';
+    table.parentElement?.insertBefore(liveTag, table);
+  }
+
+  const res = await apiGet('/api/prices/' + clientId + '/tonight');
+  document.getElementById('live-prices-loading')?.remove();
+
+  if (!res?.success || !res.data?.length) return;
+
+  // Overlay Airtable prices onto COMPETITORS array by name match
+  let updated = false;
+  res.data.forEach(record => {
+    if (!record.price) return;
+    const match = COMPETITORS.find(c =>
+      !c.you && (
+        c.name?.toLowerCase().includes(record.hotelName?.toLowerCase()) ||
+        record.hotelName?.toLowerCase().includes(c.name?.toLowerCase())
+      )
+    );
+    if (match) {
+      match.yesterday = match.price;
+      match.price     = record.price;
+      if (record.rating) match.stars = Math.round(record.rating);
+      updated = true;
+    }
+  });
+
+  if (updated) {
+    renderOverviewTable();
+    renderPositionGauge();
+    toast('📡 Prix en direct', 'Données mises à jour depuis Airtable', '#10B981');
+  }
 }
 
 function getRecommendation(c, myPrice, cheapestPrice) {
@@ -1984,17 +2035,23 @@ function initSettings() {
   if (eaBadge) eaBadge.style.display = ea ? 'inline-flex' : 'none';
   if (activeBadge) activeBadge.style.display = ea ? 'none' : 'inline-flex';
 
-  const comps = COMPETITORS.filter(c => !c.you);
-  document.getElementById('comp-settings-list').innerHTML = comps.map(c => `
-    <div class="comp-item">
+  const userComps = (SESSION_USER?.competitors || []).filter(c => c.name);
+  const titleEl = document.getElementById('comp-settings-title');
+  if (titleEl) titleEl.innerHTML = `🏁 Mes concurrents <span style="font-size:12px;color:var(--muted);font-weight:400">(${userComps.length} actifs)</span>`;
+  const displayComps = userComps.length ? userComps : COMPETITORS.filter(c => !c.you).map(c => ({name:c.name, url:''}));
+  document.getElementById('comp-settings-list').innerHTML = displayComps.length
+    ? displayComps.map((c, i) => `
+    <div class="comp-item" id="comp-item-${i}">
       <div class="comp-item-icon">🏨</div>
-      <div>
+      <div style="flex:1;min-width:0">
         <div class="comp-item-name">${esc(c.name)}</div>
-        <div class="comp-item-url">booking.com/hotel/be/...</div>
+        <div class="comp-item-url">${c.url ? esc(c.url) : 'booking.com'}</div>
       </div>
       <div class="status-dot active" title="Actif"></div>
-      <button class="btn btn-ghost btn-sm" style="color:var(--red);padding:4px 8px" onclick="toast('Supprimé','${c.name} retiré de la surveillance','#EF4444')">✕</button>
-    </div>`).join('');
+      <button class="btn btn-ghost btn-sm" style="color:var(--red);padding:4px 8px"
+        onclick="removeSettingsCompetitor(${i})">✕</button>
+    </div>`).join('')
+    : `<div style="color:var(--muted);font-size:13px;padding:12px 0">Aucun concurrent configuré.</div>`;
 }
 
 // ============================================================
@@ -2740,6 +2797,159 @@ function setClientCount(n) {
 function incrementClientCount() { setClientCount(getClientCount() + 1); }
 
 // ============================================================
+// BACKEND API
+// ============================================================
+const API_BASE = 'https://rateradar-backend-production.up.railway.app';
+let _offlineToastActive = false;
+
+function offlineToast() {
+  if (_offlineToastActive) return;
+  _offlineToastActive = true;
+  toast('Mode hors ligne', 'Les changements seront synchronisés plus tard', '#F59E0B');
+  setTimeout(() => { _offlineToastActive = false; }, 15000);
+}
+
+async function apiRequest(method, path, body, retries = 1) {
+  const opts = {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    signal: AbortSignal.timeout(8000),
+    ...(body ? { body: JSON.stringify(body) } : {})
+  };
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const r = await fetch(API_BASE + path, opts);
+      return await r.json();
+    } catch(e) {
+      if (attempt < retries) {
+        await new Promise(res => setTimeout(res, 3000));
+      } else {
+        console.warn('[API]', method, path, e.message);
+        offlineToast();
+        return null;
+      }
+    }
+  }
+}
+const apiGet  = path        => apiRequest('GET',    path);
+const apiPost = (path, body) => apiRequest('POST',   path, body);
+const apiPut  = (path, body) => apiRequest('PUT',    path, body);
+const apiDel  = path        => apiRequest('DELETE',  path);
+
+// Shared backend IDs written by the marketing site at registration
+function getBackendIds(email) {
+  try { return JSON.parse(localStorage.getItem('rr_backend_' + email) || 'null'); } catch(e) { return null; }
+}
+
+async function syncClientToBackend(user) {
+  const payload = {
+    name:         user.firstName || user.email,
+    email:        user.email,
+    hotelName:    user.hotelName || 'En attente',
+    hotelCity:    user.city      || 'En attente',
+    currentPrice: user.currentPrice || 0,
+    plan:         (user.plan || 'Starter').toLowerCase(),
+  };
+  try {
+    if (user.backendAirtableId) {
+      // Update the placeholder record created at registration
+      await apiPut('/api/clients/' + user.backendAirtableId, payload);
+    } else {
+      const res = await apiPost('/api/clients', payload);
+      if (res?.success && res.data?.clientId) {
+        user.backendClientId   = res.data.clientId;
+        user.backendAirtableId = res.data.id;
+        saveStoredUser(user);
+        localStorage.setItem('rr_backend_' + user.email,
+          JSON.stringify({ clientId: res.data.clientId, airtableId: res.data.id }));
+      }
+    }
+  } catch(e) { console.warn('[API] syncClientToBackend:', e.message); }
+}
+
+async function syncCompetitorsToBackend(user) {
+  if (!user.backendClientId) return;
+  const comps = (user.competitors || []).filter(c => c.name?.trim());
+  let changed = false;
+  for (const comp of comps) {
+    if (comp.backendId) continue; // already synced
+    const res = await apiPost('/api/competitors', {
+      clientId:   user.backendClientId,
+      hotelName:  comp.name,
+      bookingUrl: comp.url  || '',
+      city:       user.city || '',
+    });
+    if (res?.success && res.data?.id) {
+      comp.backendId = res.data.id;
+      changed = true;
+    }
+  }
+  if (changed) saveStoredUser(user);
+}
+
+async function removeCompetitorFromBackend(comp) {
+  if (!comp.backendId) return;
+  await apiDel('/api/competitors/' + comp.backendId);
+}
+
+async function removeSettingsCompetitor(idx) {
+  if (!SESSION_USER) return;
+  const comps = (SESSION_USER.competitors || []).filter(c => c.name);
+  const comp  = comps[idx];
+  if (!comp) return;
+  // Optimistic UI
+  document.getElementById('comp-item-' + idx)?.remove();
+  toast('Supprimé', esc(comp.name) + ' retiré de la surveillance', '#EF4444');
+  // Remove from localStorage
+  SESSION_USER.competitors = (SESSION_USER.competitors || []).filter((_, i) => i !== idx);
+  saveStoredUser(SESSION_USER);
+  // Remove from backend (non-blocking)
+  removeCompetitorFromBackend(comp);
+}
+
+async function addSettingsCompetitor() {
+  const nameEl = document.getElementById('settings-new-comp-name');
+  const urlEl  = document.getElementById('settings-new-comp-url');
+  const name   = (nameEl?.value || '').trim();
+  const url    = (urlEl?.value  || '').trim();
+  if (!name) { toast('Requis', 'Entrez le nom de l\'hôtel', '#EF4444'); return; }
+  const comp = { name, url };
+  if (!SESSION_USER.competitors) SESSION_USER.competitors = [];
+  SESSION_USER.competitors.push(comp);
+  saveStoredUser(SESSION_USER);
+  if (nameEl) nameEl.value = '';
+  if (urlEl)  urlEl.value  = '';
+  // Sync to backend
+  if (SESSION_USER.backendClientId) {
+    const res = await apiPost('/api/competitors', {
+      clientId:  SESSION_USER.backendClientId,
+      hotelName: name,
+      bookingUrl: url,
+      city:      SESSION_USER.city || '',
+    });
+    if (res?.success && res.data?.id) {
+      comp.backendId = res.data.id;
+      saveStoredUser(SESSION_USER);
+    }
+  }
+  initSettings(); // re-render list
+  toast('Ajouté ✓', name + ' ajouté à la surveillance', '#10B981');
+}
+
+async function triggerManualScrape() {
+  const clientId = SESSION_USER?.backendAirtableId;
+  if (!clientId) { toast('Erreur', 'Compte non synchronisé avec le backend', '#EF4444'); return; }
+  const btn = document.getElementById('admin-scrape-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⟳ Scraping en cours…'; }
+  toast('Scraping lancé 🚀', 'Vérifiez les prix dans 2 minutes', '#3B82F6');
+  const res = await apiPost('/api/scrape/now/' + clientId);
+  if (btn) { btn.disabled = false; btn.textContent = '🔍 Lancer le scraping maintenant'; }
+  if (res?.success) {
+    toast('Scraping terminé ✓', 'Les nouveaux prix seront visibles dans le dashboard', '#10B981');
+  }
+}
+
+// ============================================================
 // LOCALSTORAGE + SESSION
 // ============================================================
 const ADMIN_EMAIL = 'matisse.zamcre@gmail.com';
@@ -2796,6 +3006,15 @@ function tryLogin() {
   } else {
     user.lastLogin = today;
     saveStoredUser(user);
+  }
+  // Merge backend IDs written by the marketing site at registration
+  if (!user.backendClientId) {
+    const ids = getBackendIds(user.email);
+    if (ids?.clientId) {
+      user.backendClientId   = ids.clientId;
+      user.backendAirtableId = ids.airtableId;
+      saveStoredUser(user);
+    }
   }
   SESSION_USER = user;
   document.getElementById('login-overlay').classList.add('hidden');
@@ -2876,6 +3095,8 @@ function obNext1() {
     saveStoredUser(SESSION_USER);
     sendWelcomeEmail(SESSION_USER);
   }
+  // Sync to backend — create if new, update if placeholder was already created by marketing site
+  syncClientToBackend(SESSION_USER);
   obShowStep(2);
 }
 
@@ -2946,6 +3167,7 @@ function obFinish() {
   obShowStep(5);
   launchConfetti();
   sendOnboardingCompleteEmail(SESSION_USER);
+  syncCompetitorsToBackend(SESSION_USER); // async, non-blocking
 }
 
 function finishOnboarding() {
