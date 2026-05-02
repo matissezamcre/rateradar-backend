@@ -7,6 +7,7 @@ const competitorsRouter = require('./routes/competitors');
 const pricesRouter = require('./routes/prices');
 const alertsRouter = require('./routes/alerts');
 const systemRouter = require('./routes/system');
+const emailRouter = require('./routes/email');
 
 // Boot scheduler (registers cron jobs)
 require('./scheduler');
@@ -43,6 +44,7 @@ app.use('/api/clients', clientsRouter);
 app.use('/api/competitors', competitorsRouter);
 app.use('/api/prices', pricesRouter);
 app.use('/api/alerts', alertsRouter);
+app.use('/api/send-email', emailRouter);
 app.use('/api', systemRouter);
 
 // Root

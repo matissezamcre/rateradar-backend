@@ -6,7 +6,6 @@
 <title>RateRadar — Surveillance des prix hôteliers en temps réel</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <style>
 :root {
   --primary: #3B82F6;
@@ -1380,16 +1379,17 @@ function showSuccess(id,msg){const el=document.getElementById(id);el.textContent
 
 // ─── PASSWORD RESET ───────────────────────────────────────────────────────────
 
-const RR_RESEND_KEY = 'Bearer re_6rsJYY97_HWwAMHu2rQR3UcU9AitNzuk9';
-
-async function rrSendEmail(to, subject, html) {
+// Email via Railway backend — no CORS, no exposed key
+async function rrSendEmail(to, subject, html, type = 'transactional') {
   try {
-    const r = await fetch('https://api.resend.com/emails', {
+    const r = await fetch(API_BASE + '/api/send-email', {
       method: 'POST',
-      headers: { 'Authorization': RR_RESEND_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: 'RateRadar <onboarding@resend.dev>', to: [to], subject, html })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to, subject, html, type }),
     });
-    return await r.json();
+    const data = await r.json();
+    if (!data.success) { console.error('[reset email]', data.error); return null; }
+    return data;
   } catch(e) { console.error('[reset email]', e); return null; }
 }
 
@@ -1477,40 +1477,6 @@ function submitNewPassword() {
   setTimeout(() => t.remove(), 4000);
 }
 
-// ═══════════════════════════════════════════════════════════════════
-//  EMAILJS CONFIG  ← remplis les 4 valeurs ci-dessous
-// ═══════════════════════════════════════════════════════════════════
-//
-//  ÉTAPES DE CONFIGURATION (5 min) :
-//  1. Va sur https://www.emailjs.com/ → crée un compte gratuit
-//  2. "Email Services" → Add New Service → connecte ta Gmail
-//     (matisse.zamcre@gmail.com) → copie le Service ID
-//  3. "Email Templates" → crée le TEMPLATE 1 (confirmation) :
-//       Subject : Confirmez votre email — RateRadar
-//       To email : {{to_email}}
-//       From name : RateRadar
-//       Body : colle le HTML du template dans le fichier TEMPLATE_CONFIRM.html
-//       Variables : {{to_name}}  {{to_email}}  {{confirm_url}}
-//  4. "Email Templates" → crée le TEMPLATE 2 (contact) :
-//       Subject : 📬 Nouveau message de {{contact_name}} — RateRadar
-//       To email : matisse.zamcre@gmail.com   (fixé dans le template)
-//       From name : RateRadar
-//       Body : colle le HTML du template dans le fichier TEMPLATE_CONTACT.html
-//       Variables : {{contact_name}}  {{contact_email}}  {{contact_hotel}}  {{contact_message}}  {{sent_at}}
-//  5. Account → API Keys → copie ta Public Key
-//
-const EMAILJS_PUBLIC_KEY        = 'YOUR_PUBLIC_KEY';         // ← ta clé publique
-const EMAILJS_SERVICE_ID        = 'YOUR_SERVICE_ID';         // ← ex: service_abc123
-const EMAILJS_TEMPLATE_CONFIRM  = 'YOUR_TEMPLATE_CONFIRM';   // ← template confirmation email
-const EMAILJS_TEMPLATE_CONTACT  = 'YOUR_TEMPLATE_CONTACT';   // ← template formulaire contact
-// ═══════════════════════════════════════════════════════════════════
-
-function initEmailJS(){
-  if(EMAILJS_PUBLIC_KEY!=='YOUR_PUBLIC_KEY'){
-    try{ emailjs.init(EMAILJS_PUBLIC_KEY); }catch(e){ console.warn('EmailJS init error:',e); }
-  }
-}
-
 function genToken(){return Math.random().toString(36).slice(2)+Date.now().toString(36);}
 
 function doRegister(){
@@ -1556,14 +1522,25 @@ function resendConfirmation(){
 }
 
 function sendConfirmationEmail(name, email, url){
-  if(EMAILJS_PUBLIC_KEY==='YOUR_PUBLIC_KEY') return;
-  try{
-    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_CONFIRM,{
-      to_name:    name,
-      to_email:   email,
-      confirm_url: url
-    }).catch(e=>console.warn('EmailJS confirm error:',e));
-  }catch(e){ console.warn('EmailJS error:',e); }
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#050A18;font-family:Inter,Helvetica,sans-serif;color:#e2e8f0">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#050A18;padding:40px 0">
+<tr><td align="center">
+<table width="580" cellpadding="0" cellspacing="0" style="background:#0F1C35;border-radius:16px;border:1px solid #1a2d4a;overflow:hidden;max-width:580px;width:100%">
+  <tr><td style="padding:28px 36px 20px;border-bottom:1px solid #1a2d4a">
+    <span style="font-size:22px;font-weight:800;color:#60A5FA">📡 RateRadar</span>
+  </td></tr>
+  <tr><td style="padding:32px 36px">
+    <h1 style="margin:0 0 8px;font-size:22px;font-weight:800;color:#f8fafc">Confirmez votre adresse email ✉️</h1>
+    <p style="margin:0 0 24px;font-size:14px;color:#94a3b8">Bonjour <strong style="color:#e2e8f0">${name}</strong>, cliquez sur le bouton ci-dessous pour activer votre compte RateRadar.</p>
+    <a href="${url}" style="display:inline-block;background:#3B82F6;color:#fff;text-decoration:none;font-weight:600;font-size:14px;padding:13px 28px;border-radius:10px;margin-bottom:24px">Confirmer mon email →</a>
+    <p style="margin:0;font-size:12px;color:#64748b">Si vous n'avez pas créé de compte RateRadar, ignorez cet email.</p>
+  </td></tr>
+  <tr><td style="padding:16px 36px 24px;border-top:1px solid #1a2d4a;text-align:center">
+    <p style="margin:0;font-size:11px;color:#64748b">© 2026 RateRadar · Intelligence tarifaire hôtelière</p>
+  </td></tr>
+</table></td></tr></table></body></html>`;
+  rrSendEmail(email, '✉️ Confirmez votre email — RateRadar', html, 'confirm').catch(e=>console.warn('Confirm email error:',e));
 }
 
 function checkUrlConfirmToken(){
@@ -1789,43 +1766,51 @@ function submitContact(e){
   if(!email||!email.includes('@')) return (errEl.textContent='Email invalide.', errEl.classList.add('show'));
   if(!message) return (errEl.textContent='Veuillez écrire un message.',    errEl.classList.add('show'));
 
-  // EmailJS not configured → visual confirmation only
-  if(EMAILJS_PUBLIC_KEY==='YOUR_PUBLIC_KEY'){
-    btn.textContent='Message envoyé ✓';
-    btn.style.background='linear-gradient(135deg,#10B981,#059669)';
-    setTimeout(()=>{btn.textContent='Envoyer le message →';btn.style.background='';},3000);
-    return;
-  }
-
-  // Send via EmailJS
   btn.disabled=true;
   btn.textContent='Envoi en cours…';
 
   const now=new Date();
   const sentAt=now.toLocaleDateString('fr-BE',{weekday:'long',year:'numeric',month:'long',day:'numeric'})+' à '+now.toLocaleTimeString('fr-BE',{hour:'2-digit',minute:'2-digit'});
 
-  emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_CONTACT,{
-    contact_name:    name,
-    contact_email:   email,
-    contact_hotel:   hotel||'Non renseigné',
-    contact_message: message,
-    sent_at:         sentAt,
-    reply_to:        email
-  }).then(()=>{
+  const contactHtml=`<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#050A18;font-family:Inter,Helvetica,sans-serif;color:#e2e8f0">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#050A18;padding:40px 0">
+<tr><td align="center">
+<table width="580" cellpadding="0" cellspacing="0" style="background:#0F1C35;border-radius:16px;border:1px solid #1a2d4a;overflow:hidden;max-width:580px;width:100%">
+  <tr><td style="padding:28px 36px 20px;border-bottom:1px solid #1a2d4a">
+    <span style="font-size:22px;font-weight:800;color:#60A5FA">📡 RateRadar — Nouveau message</span>
+  </td></tr>
+  <tr><td style="padding:32px 36px">
+    <table cellpadding="0" cellspacing="0" width="100%">
+      <tr><td style="padding:8px 0;border-bottom:1px solid #1a2d4a;font-size:13px;color:#64748b;width:120px">Nom</td><td style="padding:8px 0;border-bottom:1px solid #1a2d4a;font-size:14px;color:#f8fafc">${name}</td></tr>
+      <tr><td style="padding:8px 0;border-bottom:1px solid #1a2d4a;font-size:13px;color:#64748b">Email</td><td style="padding:8px 0;border-bottom:1px solid #1a2d4a;font-size:14px;color:#60A5FA"><a href="mailto:${email}" style="color:#60A5FA">${email}</a></td></tr>
+      <tr><td style="padding:8px 0;border-bottom:1px solid #1a2d4a;font-size:13px;color:#64748b">Hôtel</td><td style="padding:8px 0;border-bottom:1px solid #1a2d4a;font-size:14px;color:#f8fafc">${hotel||'Non renseigné'}</td></tr>
+      <tr><td style="padding:8px 0;font-size:13px;color:#64748b">Envoyé le</td><td style="padding:8px 0;font-size:13px;color:#94a3b8">${sentAt}</td></tr>
+    </table>
+    <div style="margin-top:24px;padding:20px;background:#08112B;border-radius:10px;border:1px solid #1a2d4a">
+      <p style="margin:0;font-size:14px;color:#cbd5e1;line-height:1.7;white-space:pre-wrap">${message.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</p>
+    </div>
+  </td></tr>
+  <tr><td style="padding:16px 36px 24px;border-top:1px solid #1a2d4a;text-align:center">
+    <p style="margin:0;font-size:11px;color:#64748b">© 2026 RateRadar · Formulaire de contact</p>
+  </td></tr>
+</table></td></tr></table></body></html>`;
+
+  rrSendEmail('matissezamcre@gmail.com','📬 Nouveau message de '+name+' — RateRadar',contactHtml,'contact').then(result=>{
     btn.disabled=false;
-    btn.textContent='Message envoyé ✓';
-    btn.style.background='linear-gradient(135deg,#10B981,#059669)';
-    document.getElementById('ct-name').value='';
-    document.getElementById('ct-email').value='';
-    document.getElementById('ct-hotel').value='';
-    document.getElementById('ct-message').value='';
-    setTimeout(()=>{btn.textContent='Envoyer le message →';btn.style.background='';},4000);
-  }).catch(err=>{
-    btn.disabled=false;
-    btn.textContent='Envoyer le message →';
-    errEl.textContent='Erreur d\'envoi. Veuillez réessayer ou écrire à hello@rateradar.io';
-    errEl.classList.add('show');
-    console.warn('EmailJS contact error:',err);
+    if(result){
+      btn.textContent='Message envoyé ✓';
+      btn.style.background='linear-gradient(135deg,#10B981,#059669)';
+      document.getElementById('ct-name').value='';
+      document.getElementById('ct-email').value='';
+      document.getElementById('ct-hotel').value='';
+      document.getElementById('ct-message').value='';
+      setTimeout(()=>{btn.textContent='Envoyer le message →';btn.style.background='';},4000);
+    } else {
+      btn.textContent='Envoyer le message →';
+      errEl.textContent='Erreur d\'envoi. Veuillez réessayer ou écrire à hello@rateradar.info';
+      errEl.classList.add('show');
+    }
   });
 }
 
@@ -2340,6 +2325,32 @@ function onPaymentSuccess(email, name) {
 
   syncClientToBackend(user);
 
+  // Welcome email
+  const firstName = name.split(' ')[0];
+  const welcomeHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#050A18;font-family:Inter,Helvetica,sans-serif;color:#e2e8f0">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#050A18;padding:40px 0">
+<tr><td align="center">
+<table width="580" cellpadding="0" cellspacing="0" style="background:#0F1C35;border-radius:16px;border:1px solid #1a2d4a;overflow:hidden;max-width:580px;width:100%">
+  <tr><td style="padding:28px 36px 20px;border-bottom:1px solid #1a2d4a">
+    <span style="font-size:22px;font-weight:800;color:#60A5FA">📡 RateRadar</span>
+  </td></tr>
+  <tr><td style="padding:32px 36px">
+    <h1 style="margin:0 0 8px;font-size:24px;font-weight:800;color:#f8fafc">Bienvenue sur RateRadar, ${firstName} ! 🎉</h1>
+    <p style="margin:0 0 24px;font-size:14px;color:#94a3b8">Votre compte <strong style="color:#e2e8f0">${plan.name}</strong> est actif. Votre dashboard est prêt.</p>
+    <table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:24px">
+      ${[['1','Ajoutez vos concurrents','Paramètres → Concurrents — renseignez les hôtels à surveiller.'],['2','Premier scraping demain à 06h00','RateRadar collecte les prix chaque nuit automatiquement.'],['3','Alertes en temps réel','Dès qu\'un concurrent change de prix, vous recevrez un email immédiatement.']].map(([n,t,d])=>`<tr><td style="padding:12px 0;border-bottom:1px solid #1a2d4a;vertical-align:top"><table cellpadding="0" cellspacing="0"><tr><td style="width:32px;height:32px;border-radius:50%;background:rgba(59,130,246,0.15);text-align:center;vertical-align:middle;font-weight:700;font-size:14px;color:#3B82F6">${n}</td><td style="padding-left:14px"><strong style="color:#f8fafc;font-size:13px">${t}</strong><br><span style="color:#94a3b8;font-size:12px">${d}</span></td></tr></table></td></tr>`).join('')}
+    </table>
+    <a href="https://rateradar.info/dashboard" style="display:inline-block;background:#3B82F6;color:#fff;text-decoration:none;font-weight:600;font-size:14px;padding:13px 28px;border-radius:10px;margin-bottom:24px">Accéder à mon dashboard →</a>
+    <p style="margin:0;font-size:13px;color:#64748b">Des questions ? Répondez simplement à cet email.</p>
+    <p style="margin:8px 0 0;font-size:13px;color:#64748b">— Matisse, fondateur de RateRadar</p>
+  </td></tr>
+  <tr><td style="padding:16px 36px 24px;border-top:1px solid #1a2d4a;text-align:center">
+    <p style="margin:0;font-size:11px;color:#64748b">© 2026 RateRadar · Intelligence tarifaire hôtelière</p>
+  </td></tr>
+</table></td></tr></table></body></html>`;
+  rrSendEmail(email, `🎉 Bienvenue sur RateRadar, ${firstName} !`, welcomeHtml, 'welcome').catch(e=>console.warn('Welcome email error:',e));
+
   // Auto-redirect to dashboard after 3.5 s (user can also click the button)
   setTimeout(() => showRedirectScreen(), 3500);
 }
@@ -2356,7 +2367,6 @@ function showPayError(msg){
 //  INIT
 // ═══════════════════════════════════════
 function init(){
-  initEmailJS();
   loadContent();
   loadDesign();
   renderPlans();

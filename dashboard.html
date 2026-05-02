@@ -841,10 +841,11 @@ input[type="date"]:focus,select:focus,.filter-input:focus{border-color:var(--blu
       <button class="btn btn-secondary btn-sm" onclick="setAdminSimulation(0)">Simuler : 0 clients</button>
       <button class="btn btn-secondary btn-sm" onclick="setAdminSimulation(7)">Simuler : 7 clients</button>
       <button class="btn btn-secondary btn-sm" onclick="setAdminSimulation(10)">Simuler : 10 clients (normal)</button>
-      <button class="btn btn-secondary btn-sm" style="border-color:rgba(139,92,246,0.4);color:var(--violet)" onclick="sendPriceAlertTest(SESSION_EMAIL)">📧 Envoyer email test (alerte prix)</button>
+      <button class="btn btn-secondary btn-sm" style="border-color:rgba(139,92,246,0.4);color:var(--violet)" onclick="runEmailTest()">📧 TEST EMAIL</button>
       <button class="btn btn-primary btn-sm" id="admin-scrape-btn" onclick="triggerManualScrape()" style="background:linear-gradient(135deg,var(--green),#059669)">🔍 Lancer le scraping maintenant</button>
       <span id="admin-pricing-saved" style="font-size:12px;color:var(--green);display:none">✓ Sauvegardé</span>
     </div>
+    <div id="email-test-result" style="display:none"></div>
   </div>
 
   <div id="admin-client-grid"></div>
@@ -2076,21 +2077,19 @@ function initSettings() {
 }
 
 // ============================================================
-// EMAIL — RESEND API
+// EMAIL — via Railway backend (no CORS, no exposed key)
 // ============================================================
-const RESEND_KEY  = 'Bearer re_6rsJYY97_HWwAMHu2rQR3UcU9AitNzuk9';
-const RESEND_FROM = 'RateRadar <onboarding@resend.dev>';
-const DASHBOARD_URL = 'https://rateradar.io/dashboard';
+const DASHBOARD_URL = 'https://rateradar.info/dashboard';
 
-async function sendEmail(to, subject, html) {
+async function sendEmail(to, subject, html, type = 'transactional') {
   try {
-    const r = await fetch('https://api.resend.com/emails', {
+    const r = await fetch(API_BASE + '/api/send-email', {
       method: 'POST',
-      headers: { 'Authorization': RESEND_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: RESEND_FROM, to: [to], subject, html })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to, subject, html, type }),
     });
     const data = await r.json();
-    if (!r.ok) { console.error('[RateRadar email]', data); return null; }
+    if (!data.success) { console.error('[RateRadar email]', data.error); return null; }
     return data;
   } catch(e) { console.error('[RateRadar email]', e); return null; }
 }
@@ -2146,7 +2145,7 @@ async function sendWelcomeEmail(user) {
     <p style="font-size:13px;color:#94a3b8;margin:24px 0 0">Des questions ? Répondez simplement à cet email, je lis tout.</p>
     <p style="font-size:13px;color:#64748b;margin:16px 0 0">— Matisse, fondateur de RateRadar</p>
   `);
-  const result = await sendEmail(user.email, `🎉 Bienvenue sur RateRadar, ${firstName} !`, html);
+  const result = await sendEmail(user.email, `🎉 Bienvenue sur RateRadar, ${firstName} !`, html, 'welcome');
   if (result?.id) toast('📧 Email de bienvenue envoyé !', user.email, '#10B981');
 }
 
@@ -2169,7 +2168,7 @@ async function sendOnboardingCompleteEmail(user) {
     </div>
     <a href="${DASHBOARD_URL}" style="${btnStyle()}">Voir mon dashboard →</a>
   `);
-  const result = await sendEmail(user.email, `✅ Votre dashboard est configuré — ${user.hotelName||'RateRadar'}`, html);
+  const result = await sendEmail(user.email, `✅ Votre dashboard est configuré — ${user.hotelName||'RateRadar'}`, html, 'onboarding');
   if (result?.id) toast('📧 Email de confirmation envoyé !', user.email, '#10B981');
 }
 
@@ -2210,9 +2209,36 @@ async function sendPriceAlertTest(to) {
     </div>
     <a href="${DASHBOARD_URL}" style="${btnStyle('#EF4444')}">Voir le dashboard →</a>
   `);
-  const result = await sendEmail(to, '⚠️ Hotel Montovani a baissé ses prix de 15%', html);
+  const result = await sendEmail(to, '⚠️ Hotel Montovani a baissé ses prix de 15%', html, 'test-alert');
+  const box = document.getElementById('email-test-result');
+  if (box) {
+    if (result?.id) {
+      box.style.cssText = 'display:block;margin-top:12px;padding:12px 16px;border-radius:10px;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.4);color:#6ee7b7;font-size:13px;font-weight:500';
+      box.innerHTML = `✅ Email envoyé avec succès — id: <code style="font-family:monospace;font-size:12px">${result.id}</code>`;
+    } else {
+      box.style.cssText = 'display:block;margin-top:12px;padding:12px 16px;border-radius:10px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.4);color:#fca5a5;font-size:13px;font-weight:500';
+      box.innerHTML = `❌ Échec d'envoi — vérifiez que <code style="font-family:monospace;font-size:12px">RESEND_API_KEY</code> est configuré sur Railway et que le domaine <strong>rateradar.info</strong> est vérifié.`;
+    }
+    setTimeout(() => { if(box) box.style.display='none'; }, 12000);
+  }
   if (result?.id) toast('📧 Email test envoyé !', to, '#10B981');
-  else toast('Erreur email', 'Vérifiez la console pour les détails', '#EF4444');
+  else toast('Erreur email', 'Domaine vérifié sur Resend ? Clé API sur Railway ?', '#EF4444');
+}
+
+async function runEmailTest() {
+  const btn = event.currentTarget;
+  const to = SESSION_EMAIL || prompt('Email de destination :');
+  if (!to) return;
+  const box = document.getElementById('email-test-result');
+  if (box) {
+    box.style.cssText = 'display:block;margin-top:12px;padding:12px 16px;border-radius:10px;background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);color:#a5b4fc;font-size:13px';
+    box.innerHTML = '⏳ Envoi en cours…';
+  }
+  btn.disabled = true;
+  btn.textContent = '⏳ Envoi…';
+  await sendPriceAlertTest(to);
+  btn.disabled = false;
+  btn.textContent = '📧 TEST EMAIL';
 }
 
 // ============================================================

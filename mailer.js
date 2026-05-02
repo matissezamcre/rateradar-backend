@@ -2,8 +2,8 @@ require('dotenv').config();
 const { Resend } = require('resend');
 
 const resend = new Resend(process.env.RESEND_API_KEY);
-const FROM = 'alerts@rateradar.io';
-const DASHBOARD_URL = process.env.DASHBOARD_URL || 'https://rateradar.io';
+const FROM = 'RateRadar <hello@rateradar.info>';
+const DASHBOARD_URL = process.env.DASHBOARD_URL || 'https://rateradar.info';
 
 // ─── Price drop alert ─────────────────────────────────────────────────────────
 
