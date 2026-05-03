@@ -19,10 +19,12 @@ const PORT = process.env.PORT || 3001;
 
 app.use(cors({
   origin: [
-    'http://localhost:3000',
     'https://rateradar.io',
+    'https://rateradar.info',
+    'https://rateradars.vercel.app',
     'https://rateradar-peach.vercel.app',
     /^https:\/\/.*\.vercel\.app$/,
+    /^http:\/\/localhost(:\d+)?$/,
     /^file:\/\//,
   ],
   credentials: true,

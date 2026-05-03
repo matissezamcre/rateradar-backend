@@ -1381,16 +1381,25 @@ function showSuccess(id,msg){const el=document.getElementById(id);el.textContent
 
 // Email via Railway backend — no CORS, no exposed key
 async function rrSendEmail(to, subject, html, type = 'transactional') {
+  const url = API_BASE + '/api/send-email';
+  console.log(`%c[RateRadar email] → POST ${url}`, 'color:#6366f1;font-weight:bold', { to, subject, type });
   try {
-    const r = await fetch(API_BASE + '/api/send-email', {
+    const r = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ to, subject, html, type }),
     });
     const data = await r.json();
-    if (!data.success) { console.error('[reset email]', data.error); return null; }
+    if (!data.success) {
+      console.error(`%c[RateRadar email] ✗ ${type}`, 'color:#ef4444;font-weight:bold', data.error);
+      return null;
+    }
+    console.log(`%c[RateRadar email] ✓ ${type} → ${to}`, 'color:#10b981;font-weight:bold', data);
     return data;
-  } catch(e) { console.error('[reset email]', e); return null; }
+  } catch(e) {
+    console.error(`%c[RateRadar email] ✗ fetch failed`, 'color:#ef4444;font-weight:bold', e.message);
+    return null;
+  }
 }
 
 async function sendPasswordReset() {
